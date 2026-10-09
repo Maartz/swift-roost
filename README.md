@@ -11,7 +11,7 @@
     <a href="examples/Roost">Try the reading-list example</a> ·
     <a href="guides/tutorial-todo-app.md">Build a Todo app</a> ·
     <a href="#the-stack">The stack</a> ·
-    <a href="guides/dx-acceptance.md">Project status</a>
+    <a href="Sources/Roost/Roost.docc/ProjectStatus.md">Project status</a>
   </p>
 </div>
 
@@ -63,7 +63,7 @@ chosen actions, `conn.permit` decodes only the fields an input type declares, an
 every request is logged and traced by action with secrets filtered. It uses
 published Nexus 2.x (from 2.1.0), Spectro 2.x (from 2.3.0), and ESW 1.6.0. Moving from
 Peregrine? Follow the [upgrade guide](guides/renaming-to-roost.md).
-[See what has been verified and what remains.](guides/dx-acceptance.md)
+[See what is implemented and what remains.](Sources/Roost/Roost.docc/ProjectStatus.md)
 
 <details>
 <summary>Contents</summary>
@@ -459,8 +459,7 @@ python3 scripts/check_generated_app.py --framework ../swift-roost --release
 
 The script creates and removes its own database, retaining diagnostic logs in
 the printed workspace. CI checks published dependencies separately from the
-generated-app integration. Detailed results live in the
-[acceptance notes](guides/dx-acceptance.md).
+generated-app integration.
 
 ## Deployment
 
@@ -515,8 +514,6 @@ and PubSub, with different levels of implementation:
 - Roost's channel upgrade route and SMTP delivery are stubs.
 - TLS and HTTP/2 configuration types exist, but Roost's bootstrap does not
   wire them into the running server.
-- Local ESW integration, published package compatibility, and hosted CI
-  results are tracked separately in the [acceptance notes](guides/dx-acceptance.md).
 
 The framework is now **Roost.** Existing apps should follow the
 [rename guide](guides/renaming-to-roost.md) for imports, environment variables,
@@ -528,10 +525,8 @@ Keep changes grounded in a runnable workflow. For framework or generator changes
 run `swift test` and the generated-app acceptance check. Include the relevant
 companion repository revisions when reporting integration results.
 
-Start with the [Todo tutorial](guides/tutorial-todo-app.md),
-[session lifecycle](guides/server-side-sessions.md), or
-[acceptance checklist](guides/dx-acceptance.md). The [specs](specs/README.md)
-describe design work; check the implementation and acceptance results for current
-behavior.
+Start with the [Todo tutorial](guides/tutorial-todo-app.md) or
+[session lifecycle](guides/server-side-sessions.md). The [specs](specs/README.md)
+describe design work; check the implementation and tests for current behavior.
 
 The [Roost mark](assets/brand/README.md) is included in `assets/brand/`.
