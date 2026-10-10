@@ -87,6 +87,7 @@ public actor TestDelivery: MailDelivery {
 // MARK: - SMTPDelivery (Stub)
 
 /// Placeholder SMTP delivery backend. Requires `swift-nio-smtp` or similar for production use.
+@available(*, deprecated, message: "SMTPDelivery doesn't send mail: it logs a warning. Implement MailDelivery with an SMTP or API client. Roost 3.0 removes it from the stable API until it is implemented.")
 public struct SMTPDelivery: MailDelivery {
     private let host: String
     private let port: Int

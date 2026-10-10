@@ -4,26 +4,26 @@ import Foundation
 
 /// Detects schema drift by comparing two SQL schema snapshots.
 ///
-/// **Workflow:**
-/// 1. After running migrations, dump the schema:
-///    `roost db:schema:dump`
-/// 2. Commit the snapshot to git:
-///    `git add .roost/schema.sql`
-/// 3. In CI or before deploys, check for drift:
-///    `roost db:drift`
+/// The `roost` CLI has no command for drift detection, so call the detector
+/// from your own tooling, such as a test or a CI script:
 ///
-/// The detector parses `CREATE TABLE` statements from SQL dump files
-/// and compares table/column definitions. It does **not** parse migration
-/// files (as the refinements doc recommends).
+/// 1. After running migrations, dump the schema with
+///    `pg_dump --schema-only`, and save it with ``saveSnapshot(_:to:)`` at
+///    ``defaultSnapshotPath`` (`.roost/schema.sql`).
+/// 2. Commit the snapshot to git.
+/// 3. In CI or before deploys, dump the live schema the same way and compare
+///    it with the committed snapshot:
 ///
 /// ```swift
 /// let actual = DriftDetector.parseSnapshot(currentSchemaDump)
-/// let expected = try DriftDetector.loadSnapshot(
-///     from: URL(fileURLWithPath: ".roost/schema.sql")
-/// )
+/// let expected = try DriftDetector.loadSnapshot(from: DriftDetector.defaultSnapshotPath)
 /// let report = DriftDetector.compare(expected: expected, actual: actual)
 /// report.printReport()
 /// ```
+///
+/// The detector parses `CREATE TABLE` statements from SQL dump files
+/// and compares table/column definitions. It does **not** parse migration
+/// files.
 public enum DriftDetector {
 
     /// Default path for the schema snapshot file.
@@ -213,7 +213,7 @@ public enum DriftDetector {
         var lines: [String] = []
         lines.append("-- Roost Schema Dump")
         lines.append("-- Generated: \(formatter.string(from: Date()))")
-        lines.append("-- Run `roost db:schema:dump` to update")
+        lines.append("-- Update with DriftDetector.saveSnapshot(_:to:) after running migrations")
         lines.append("")
 
         for (_, table) in snapshot.tables.sorted(by: { $0.key < $1.key }) {

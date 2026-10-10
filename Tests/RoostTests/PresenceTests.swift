@@ -39,7 +39,8 @@ private struct ChatApp: RoostApp {
     }
 
     @RouteBuilder var routes: [Route] {
-        channel("/socket")
+        // TestApp.connectSocket(_:) connects in process, without an HTTP route.
+        GET("/") { conn in conn.text("ok") }
     }
 }
 

@@ -29,6 +29,7 @@ extension Connection {
 ///
 /// - Note: In the current release, this registers a stub HTTP route.
 ///   Full WebSocket upgrade support will be added in a future sprint.
+@available(*, deprecated, message: "channel(_:) serves a placeholder text response instead of upgrading to a WebSocket. Test channels with TestApp.connectSocket(_:). Roost 3.0 removes it from the stable API until it is implemented.")
 public func channel(_ path: String) -> Route {
     let wsPath = path.hasSuffix("/websocket") ? path : "\(path)/websocket"
     return GET(wsPath) { conn in

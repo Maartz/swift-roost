@@ -195,6 +195,7 @@ public enum JobQueue {
     }
 
     /// Creates a Postgres-backed durable queue (not yet implemented).
+    @available(*, deprecated, message: "The Postgres job queue isn't implemented: this stops the process. Use JobQueue.inMemory(). Roost 3.0 removes it from the stable API until it is implemented.")
     public static func postgres(spectro: SpectroClient) -> any RoostJobQueue {
         fatalError("Postgres job queue not yet implemented — use JobQueue.inMemory() for tests")
     }

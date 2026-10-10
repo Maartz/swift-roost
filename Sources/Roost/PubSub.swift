@@ -85,6 +85,7 @@ public final class InMemoryPubSub: RoostPubSub, @unchecked Sendable {
 /// Distributed PubSub adapter backed by Valkey PUBLISH/SUBSCRIBE.
 ///
 /// - Note: Not yet implemented. Add a valkey-swift client to `Package.swift` first.
+@available(*, deprecated, message: "ValkeyPubSub isn't implemented: each method stops the process. Use PubSub.inMemory(). Roost 3.0 removes it from the stable API until it is implemented.")
 public final class ValkeyPubSub: RoostPubSub, @unchecked Sendable {
 
     private let url: String
@@ -118,14 +119,16 @@ public final class ValkeyPubSub: RoostPubSub, @unchecked Sendable {
 /// // Dev / test
 /// PubSub.inMemory()
 ///
-/// // Production
-/// PubSub.valkey(url: "valkey://localhost:6379")
 /// ```
+///
+/// Only the in-memory adapter is implemented, so subscribers must run in the
+/// same process as the broadcaster.
 public enum PubSub {
     public static func inMemory() -> InMemoryPubSub {
         InMemoryPubSub()
     }
 
+    @available(*, deprecated, message: "ValkeyPubSub isn't implemented: each method stops the process. Use PubSub.inMemory(). Roost 3.0 removes it from the stable API until it is implemented.")
     public static func valkey(url: String) -> ValkeyPubSub {
         ValkeyPubSub(url: url)
     }

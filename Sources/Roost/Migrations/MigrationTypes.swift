@@ -189,7 +189,7 @@ public struct DriftReport: Sendable {
             }
         }
 
-        print("\nRun `roost db:schema:dump` to update snapshot")
+        print("\nIf the database is correct, save a new snapshot with DriftDetector.saveSnapshot(_:to:)")
     }
 }
 

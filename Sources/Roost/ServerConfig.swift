@@ -3,19 +3,41 @@ import Foundation
 /// Server binding settings and optional transport configuration.
 ///
 /// Roost's current bootstrap applies only `host` and `port`. The TLS and HTTP/2
-/// fields are not yet connected to the running Hummingbird server.
+/// settings are deprecated because the running Hummingbird server doesn't use
+/// them; terminate TLS in a reverse proxy instead.
 public struct ServerConfig: Sendable {
     public let host: String
     public let port: Int
 
+    // The deprecated settings, stored without the deprecated types so the
+    // supported initializer doesn't use them.
+    private let certificatePath: String?
+    private let keyPath: String?
+    private let requestsHTTP2: Bool
+
     /// Requested TLS configuration. Roost's bootstrap does not apply it yet.
-    public let tls: TLSConfig?
+    @available(*, deprecated, message: """
+        Roost's bootstrap doesn't apply TLS or HTTP/2 settings; terminate TLS in a reverse proxy. \
+        Roost 3.0 removes them from the stable API until they are implemented.
+        """)
+    public var tls: TLSConfig? {
+        guard let certificatePath, let keyPath else { return nil }
+        return TLSConfig(certificatePath: certificatePath, keyPath: keyPath)
+    }
 
     /// Requested HTTP/2 support. Setting `tls` also sets this value to `true`,
     /// but Roost's bootstrap does not yet enable HTTP/2 on the running server.
-    public let http2: Bool
+    @available(*, deprecated, message: """
+        Roost's bootstrap doesn't apply TLS or HTTP/2 settings; terminate TLS in a reverse proxy. \
+        Roost 3.0 removes them from the stable API until they are implemented.
+        """)
+    public var http2: Bool { requestsHTTP2 }
 
     /// TLS certificate and key pair.
+    @available(*, deprecated, message: """
+        Roost's bootstrap doesn't apply TLS or HTTP/2 settings; terminate TLS in a reverse proxy. \
+        Roost 3.0 removes them from the stable API until they are implemented.
+        """)
     public struct TLSConfig: Sendable {
         /// Path to the PEM-encoded certificate file.
         public let certificatePath: String
@@ -30,17 +52,38 @@ public struct ServerConfig: Sendable {
 
     // MARK: - Init
 
+    public init(host: String = "127.0.0.1", port: Int = 8080) {
+        self.host = host
+        self.port = port
+        certificatePath = nil
+        keyPath = nil
+        requestsHTTP2 = false
+    }
+
+    @available(*, deprecated, message: """
+        Roost's bootstrap doesn't apply TLS or HTTP/2 settings; terminate TLS in a reverse proxy. \
+        Roost 3.0 removes them from the stable API until they are implemented.
+        """)
     public init(
         host: String = "127.0.0.1",
         port: Int = 8080,
-        tls: TLSConfig? = nil,
+        tls: TLSConfig?,
         http2: Bool = false
     ) {
         self.host = host
         self.port = port
-        self.tls = tls
+        certificatePath = tls?.certificatePath
+        keyPath = tls?.keyPath
         // If TLS is configured, HTTP/2 is automatically enabled.
-        self.http2 = tls != nil ? true : http2
+        requestsHTTP2 = tls != nil ? true : http2
+    }
+
+    @available(*, deprecated, message: """
+        Roost's bootstrap doesn't apply TLS or HTTP/2 settings; terminate TLS in a reverse proxy. \
+        Roost 3.0 removes them from the stable API until they are implemented.
+        """)
+    public init(host: String = "127.0.0.1", port: Int = 8080, http2: Bool) {
+        self.init(host: host, port: port, tls: nil, http2: http2)
     }
 
     /// Reads `ROOST_HOST` and `ROOST_PORT` from the environment,
@@ -59,15 +102,19 @@ public struct ServerConfig: Sendable {
 
     /// Validates that any configured TLS certificate and key files exist on
     /// disk. Returns a descriptive error string on failure, or nil if valid.
+    @available(*, deprecated, message: """
+        validate() checks only the TLS files, which Roost's bootstrap doesn't use. \
+        Roost 3.0 removes it from the stable API until TLS is implemented.
+        """)
     public func validate() -> [String]? {
         var errors: [String] = []
 
-        if let tls {
-            if !FileManager.default.fileExists(atPath: tls.certificatePath) {
-                errors.append("TLS certificate file not found: \(tls.certificatePath)")
+        if let certificatePath, let keyPath {
+            if !FileManager.default.fileExists(atPath: certificatePath) {
+                errors.append("TLS certificate file not found: \(certificatePath)")
             }
-            if !FileManager.default.fileExists(atPath: tls.keyPath) {
-                errors.append("TLS key file not found: \(tls.keyPath)")
+            if !FileManager.default.fileExists(atPath: keyPath) {
+                errors.append("TLS key file not found: \(keyPath)")
             }
         }
 
