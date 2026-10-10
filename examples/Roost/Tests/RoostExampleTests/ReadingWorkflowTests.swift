@@ -8,6 +8,15 @@ private func csrf(_ response: TestResponse) throws -> String {
     return String(try #require(response.text.firstMatch(of: pattern)).output.1)
 }
 
+/// A bookmark as the JSON API receives it.
+private func linkJSON(url: String = "https://swift.org") throws -> Data {
+    try JSONSerialization.data(withJSONObject: ["title": "API link", "url": url, "note": "", "read": false])
+}
+
+private func link(_ title: String) -> Changes<Bookmark> {
+    Changes().setting(\.title, to: title).setting(\.url, to: "https://swift.org").setting(\.note, to: "").setting(\.read, to: false)
+}
+
 private func register(_ browser: TestBrowser<RoostExample>) async throws {
     let token = try csrf(await browser.get("/auth/register"))
     let response = try await browser.post("/auth/register", form: [
@@ -35,12 +44,12 @@ func readingWorkflow() async throws {
         #expect(invalid.text.contains("Enter a complete http:// or https:// link"))
         #expect(invalid.text.contains("Keep this title"))
         #expect(invalid.text.contains("Keep my note"))
-        let payload = try JSONEncoder().encode(CreateBookmarkInput(title: "API link", url: "https://swift.org", note: "", read: false))
+        let payload = try linkJSON()
         let blocked = try await alice.request(method: .post, path: "/api/bookmarks", body: payload,
             headers: ["Content-Type": "application/json"])
         #expect(blocked.status == .forbidden)
         let invalidJSON = try await alice.request(method: .post, path: "/api/bookmarks",
-            body: JSONEncoder().encode(CreateBookmarkInput(title: "API link", url: "javascript:alert(1)", note: "", read: false)),
+            body: linkJSON(url: "javascript:alert(1)"),
             headers: ["Content-Type": "application/json", "X-CSRF-Token": token])
         #expect(invalidJSON.status == .unprocessableContent)
 
@@ -118,15 +127,20 @@ func contextRollback() async throws {
             session.token = Auth.sha256Hex(token)
             session.context = "session"
             _ = try await transaction.insert(session)
-            let context = BookmarksContext(repo: transaction)
-            let bookmark = try await context.createBookmark(
-                CreateBookmarkInput(title: "Inside the transaction", url: "https://swift.org", note: "", read: false), scopeId: user.id)
+            let context = BookmarksContext(repo: transaction, reader: ReaderScope(userID: user.id))
+            let bookmark = try await context.createBookmark(link("Inside the transaction"))
             let app = try await TestApp(RoostExample.self, repository: transaction)
             let page = try await app.get("/bookmarks/\(bookmark.id)", session: ["_roost_auth_token": token])
             #expect(page.status == .ok)
             #expect(page.text.contains("Inside the transaction"))
-            try await context.setRead(id: bookmark.id, read: true, scopeId: user.id)
-            #expect(try await context.getBookmark(id: bookmark.id, scopeId: user.id).read)
+            try await context.setRead(id: bookmark.id, read: true)
+            #expect(try await context.getBookmark(id: bookmark.id).read)
+
+            // Scoped writes are single statements, so they check the owner inside the transaction too.
+            let stranger = BookmarksContext(repo: transaction, reader: ReaderScope(userID: UUID()))
+            await #expect(throws: NexusHTTPError.self) { try await stranger.setRead(id: bookmark.id, read: false) }
+            await #expect(throws: NexusHTTPError.self) { try await stranger.deleteBookmark(id: bookmark.id) }
+            #expect(try await context.getBookmark(id: bookmark.id).read)
         }
         #expect(try await repo.query(User.self).where { $0.email == email }.first() == nil)
     } catch {

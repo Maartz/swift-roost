@@ -21,53 +21,103 @@ Generated contexts store `any Repo`. Request handlers obtain it with
 `conn.repo()`, which honors a repository injected by the test harness before
 falling back to the application's Spectro client.
 
-For the generated `Bookmark` model, an ownership-scoped context reads like this:
-
-```swift
-struct BookmarksContext: Sendable {
-    let repo: any Repo
-
-    func listBookmarks(scopeId: UUID) async throws -> [Bookmark] {
-        try await repo.query(Bookmark.self)
-            .where({ $0.userId == scopeId })
-            .orderBy(\.createdAt, .asc)
-            .all()
-    }
-}
-```
-
-This snippet assumes the `Bookmark` generated in <doc:CLIAndGenerators>.
-Keep the ownership predicate inside the context. Direct callers and HTTP
-handlers then use the same rule. Generated scoped reads, updates, and deletes
-check the owner before accessing or changing a record.
-
 `conn.spectro` accesses the application's concrete client. Prefer `conn.repo()`
 in contexts and routes that should support transaction-owned repositories in
 tests. A database must be configured, or a repository injected, before calling
 these helpers.
 
-### Validate at the domain boundary
+### Scope a context to its owner
 
-A generated input type is shared by HTML and JSON. Form decoding preserves raw
-values; domain validation checks the typed value again before persistence.
-``Changeset`` collects ``ValidatorRule`` results, and `requireValid()` either
-returns the value or throws ``ValidationErrors``.
-
-For a small input:
+A ``ScopedRepo`` limits a repository to the records one owner holds. Build it
+once, when the context is created, and every method of the context inherits the
+ownership rule:
 
 ```swift
-struct NewBookmark: Sendable {
-    let title: String
+struct BookmarksContext: Sendable {
+    let bookmarks: ScopedRepo<Bookmark, UUID>
 
-    func validated() async throws -> Self {
-        var changeset = Changeset(data: self)
-        await changeset.validate(using: [
-            .required("title") { $0.title },
-            .length("title", { $0.title }, max: 160)
-        ])
-        return try changeset.requireValid()
+    init(repo: any Repo, reader: ReaderScope) {
+        bookmarks = repo.scoped(\Bookmark.userId, to: reader.userID)
+    }
+
+    func listBookmarks() async throws -> [Bookmark] {
+        try await bookmarks.query().orderBy(\.createdAt, .asc).all()
+    }
+
+    func updateBookmark(id: UUID, with changes: Changes<Bookmark>) async throws -> Bookmark {
+        try await bookmarks.update(id, Bookmark.validate(changes))
+    }
+
+    func deleteBookmark(id: UUID) async throws {
+        try await bookmarks.delete(id)
     }
 }
+```
+
+This snippet assumes the `Bookmark` generated in <doc:CLIAndGenerators> and the
+`ReaderScope` from <doc:AuthenticationAndSessions>. `query()` and `get(_:)` only
+return the owner's records. `update(_:_:)` and `delete(_:)` match the primary
+key and the owner in one SQL statement, so a method doesn't read a record
+before changing it. Another owner's record and a missing one are both a 404.
+`insert(_:)` sets the owner itself, so a request can't choose it.
+
+Contexts generated before Roost 2.2 pass the owner to each method and keep the
+ownership predicate in every query. That style still works; a scoped
+repository removes the need to repeat it.
+
+### Write typed changes
+
+``Changes`` holds the values to write to a model, each named by a key path, so
+the compiler checks the property name and the value's type:
+
+```swift
+let changes = Changes<Bookmark>().setting(\.read, to: true)
+try await repo.update(Bookmark.self, id: id, changes)
+```
+
+Writes through ``Changes`` set an `updatedAt` timestamp to the current time
+unless the changes set it themselves. Spectro's `update(_:id:changes:)` takes a
+dictionary keyed by property name instead; a misspelled key fails only when the
+query runs.
+
+### Permit and validate at the domain boundary
+
+Declare the fields a request may set once, as a ``Permitted`` value, and decode
+them from both HTML forms and JSON bodies with
+``Nexus/Connection/permit(_:decoder:)-(Permitted<Model>,_)``:
+
+```swift
+extension Bookmark {
+    static let editable = Permitted<Bookmark>(\.title, \.url, \.note, \.read)
+
+    static func validate(_ changes: Changes<Bookmark>) async throws -> Changes<Bookmark> {
+        try await changes.trimmingWhitespace().validated(using: [
+            .required(\.title),
+            .length(\.title, max: 160),
+            .length(\.note, max: 2000),
+        ])
+    }
+}
+
+// In a controller action:
+let bookmark = try await context.createBookmark(conn.permit(Bookmark.editable))
+```
+
+Each field decodes as its property's type. Fields the list leaves out, such as
+`userId`, are ignored. The key path rules of ``ValidatorRule`` name each field
+after the schema property, and ``ValidationErrors`` uses that name, which is
+also the form field's name. A rule checks only the fields the changes set,
+except `required`, which treats a missing field as blank. Adding a column then
+means changing the schema, the permitted list, and any rule for the field.
+
+For input that isn't a model, such as a login form, decode a struct with
+``Nexus/Connection/permit(_:decoder:)-(T.Type,_)``, and check it with a
+``Changeset`` whose rules name fields with strings:
+
+```swift
+var changeset = Changeset(data: credentials)
+await changeset.validate(using: [.email("email") { $0.email }])
+let valid = try changeset.requireValid()
 ```
 
 Normalize input deliberately before validation. Never accept an ownership field

@@ -67,10 +67,7 @@ extension Connection {
     /// Call this from your API authentication plug after validating
     /// the bearer token against the database.
     public func setBearerUser<U: Authenticatable>(_ user: U) -> Connection {
-        self
-            .assign(key: AuthAssign.currentUser, value: user)
-            .assign(key: AuthAssign.currentUserID, value: user.authID)
-            .assign(key: AuthAssign.authContext, value: "api")
+        roost_authenticate(user, context: .api)
     }
 }
 

@@ -10,31 +10,41 @@ import Nexus
 /// **Framework-provided protocol.** Conform your scope types to this:
 ///
 /// ```swift
-/// struct UserScope: AuthScope {
-///     let userId: String?
+/// struct ReaderScope: AuthScope {
+///     let userID: UUID
 ///
-///     static var scopeName: String { "user" }
-///     var scopeId: String? { userId }
+///     static var scopeName: String { "reader" }
+///     var scopeId: UUID? { userID }
 /// }
 /// ```
 ///
-/// Then store it in the connection:
+/// Store it in the connection once the user is known, for example in the plug
+/// that loads the user:
 ///
 /// ```swift
-/// let conn = conn.setScope(UserScope(userId: user.id.uuidString))
+/// return conn.setCurrentUser(user).setScope(ReaderScope(userID: user.id))
+/// ```
 ///
-/// // Later, retrieve it:
-/// if let scope = conn.currentScope(UserScope.self) {
-///     // query posts WHERE user_id = scope.userId
-/// }
+/// Then read it where a request needs it. ``Nexus/Connection/requireScope(_:)``
+/// throws a 401 when no reader is signed in:
+///
+/// ```swift
+/// let reader = try conn.requireScope(ReaderScope.self)
+/// let bookmarks = conn.repo().scoped(\Bookmark.userId, to: reader.userID)
 /// ```
 public protocol AuthScope: Sendable {
+    /// The type of ``scopeId``, such as `UUID` for a user's primary key.
+    ///
+    /// Swift infers it from your ``scopeId`` property. It defaults to
+    /// `String`, the type of ``scopeId`` before Roost 2.2.
+    associatedtype ScopeID: Hashable & Sendable = String
+
     /// Unique name for this scope type (e.g. `"user"`, `"session"`, `"org"`).
     static var scopeName: String { get }
 
     /// The primary identifying value for this scope (e.g. a user ID).
     /// Returns `nil` when no entity is authenticated.
-    var scopeId: String? { get }
+    var scopeId: ScopeID? { get }
 
     /// `true` when no authenticated entity is present.
     var isEmpty: Bool { get }
@@ -45,13 +55,6 @@ extension AuthScope {
     public var isEmpty: Bool { scopeId == nil }
 }
 
-// MARK: - Assign Key
-
-extension AuthAssign {
-    /// The currently active scope (type-erased).
-    public static let currentScope = "_roost_current_scope"
-}
-
 // MARK: - Connection Extensions
 
 extension Connection {
@@ -59,10 +62,10 @@ extension Connection {
     /// Store a scope in assigns.
     ///
     /// ```swift
-    /// conn = conn.setScope(UserScope(userId: user.authID))
+    /// conn = conn.setScope(ReaderScope(userID: user.id))
     /// ```
     public func setScope<S: AuthScope>(_ scope: S) -> Connection {
-        assign(key: AuthAssign.currentScope, value: scope)
+        assign(CurrentScopeKey.self, value: scope)
     }
 
     /// Retrieve the current scope, cast to the expected type.
@@ -70,18 +73,31 @@ extension Connection {
     /// Returns `nil` if no scope has been set or the type doesn't match.
     ///
     /// ```swift
-    /// if let scope = conn.currentScope(UserScope.self) { ... }
+    /// if let scope = conn.currentScope(ReaderScope.self) { ... }
     /// ```
     public func currentScope<S: AuthScope>(_ type: S.Type) -> S? {
-        assigns[AuthAssign.currentScope] as? S
+        self[CurrentScopeKey.self] as? S
+    }
+
+    /// The current scope, for a request that only makes sense with one.
+    ///
+    /// ```swift
+    /// let reader = try conn.requireScope(ReaderScope.self)
+    /// ```
+    ///
+    /// - Throws: `NexusHTTPError(.unauthorized)` when no scope of type `S`
+    ///   has been set, or the scope ``AuthScope/isEmpty``.
+    public func requireScope<S: AuthScope>(_ type: S.Type) throws -> S {
+        guard let scope = currentScope(type), !scope.isEmpty else {
+            throw NexusHTTPError(.unauthorized, message: "Authentication required")
+        }
+        return scope
     }
 
     /// `true` when a non-empty scope is present.
     public var hasScope: Bool {
-        if let scope = assigns[AuthAssign.currentScope] as? (any AuthScope) {
-            return !scope.isEmpty
-        }
-        return false
+        guard let scope = self[CurrentScopeKey.self] else { return false }
+        return !scope.isEmpty
     }
 }
 
@@ -154,7 +170,7 @@ public struct ScopeMetadata: Sendable, Equatable {
     public init(
         name: String,
         isDefault: Bool = false,
-        assignKey: String = AuthAssign.currentScope,
+        assignKey: String = "_roost_current_scope",
         schemaKey: String,
         schemaType: String = "UUID",
         schemaTable: String? = nil,

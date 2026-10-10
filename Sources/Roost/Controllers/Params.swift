@@ -32,10 +32,7 @@ extension Connection {
     ///   A malformed JSON body throws `NexusHTTPError(.badRequest)`.
     public func permit<T: Decodable>(_ type: T.Type, decoder: JSONDecoder = JSONDecoder()) throws -> T {
         guard isJSONRequest else {
-            var values = queryParams
-            values.merge(bodyParams) { $1 }
-            values.merge(params) { $1 }
-            return try FormValues(values).decode(as: T.self)
+            return try FormValues(roost_formParameters).decode(as: T.self)
         }
         guard case .buffered(let data) = requestBody, !data.isEmpty else {
             throw NexusHTTPError(.badRequest, message: "Missing request body")
@@ -47,10 +44,18 @@ extension Connection {
         }
     }
 
+    /// Query, form, and path parameters; later sources win.
+    var roost_formParameters: [String: String] {
+        var values = queryParams
+        values.merge(bodyParams) { $1 }
+        values.merge(params) { $1 }
+        return values
+    }
+
     /// Whether the request body is JSON: its content type is `application/json`,
     /// or a JSON-based type such as `application/vnd.api+json`.
     ///
-    /// ``permit(_:decoder:)`` decodes the body of a JSON request, and the
+    /// ``permit(_:decoder:)-(T.Type,_)`` decodes the body of a JSON request, and the
     /// query, form, and path parameters of any other.
     public var isJSONRequest: Bool {
         guard let type = request.headerFields[.contentType]?.lowercased() else { return false }
@@ -60,7 +65,7 @@ extension Connection {
 
 extension ValidationErrors {
     /// The field error a failed JSON decode stands for, as
-    /// ``Connection/permit(_:decoder:)`` reports it: "can't be blank" for a
+    /// ``Nexus/Connection/permit(_:decoder:)-(T.Type,_)`` reports it: "can't be blank" for a
     /// missing or `null` value, and "is invalid" for a value of the wrong type or
     /// format. A nested field is named by its path, such as `address.city`, and
     /// an array element by its index, such as `tags.0`.

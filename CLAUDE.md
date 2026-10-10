@@ -42,13 +42,14 @@ swift test list                              # print test identifiers
 
 **Views** (`ViewRendering.swift`, `Form.swift`): ESW templates sit beside `@ESWTemplate` view structs. `conn.render(view)` sets a task-local `FormRenderContext`, which `<.form>` reads to inject the session CSRF token and the `_method` override. A misconfigured form makes `render` throw instead of emitting an unprotected form.
 
-**Data**: `conn.repo()` returns the `RepositoryKey` override if one is set (tests inject a transaction-owned repository through `withTestRollback`). Otherwise it calls `spectro.repository()`. Contexts take `any Repo`. Migrations wrap Spectro's manager (`Migrations/`). `Validations/` provides changesets and maps database errors to field errors.
+**Data**: `conn.repo()` returns the `RepositoryKey` override if one is set (tests inject a transaction-owned repository through `withTestRollback`). Otherwise it calls `spectro.repository()`. Contexts take `any Repo`. `Data/` builds typed writes on the `_keyPathToColumn` table `@Schema` generates: `Changes<Model>` (key-path-named values), `Permitted<Model>` with `conn.permit(_:)` (decode a model's permitted fields), and `ScopedRepo` (`repo.scoped(\Model.ownerId, to:)`, whose update and delete are single owner-matching SQL statements, because `TransactionRepo.transaction` throws inside a test transaction). Migrations wrap Spectro's manager (`Migrations/`). `Validations/` provides changesets, key path rules for `Changes`, and maps database errors to field errors.
 
-**Partly implemented features.** Check before relying on these: PubSub and jobs have only in-memory implementations (the Valkey and PostgreSQL adapters are unfinished). The channel WebSocket upgrade and SMTP delivery are stubs. The TLS/HTTP2 config types are not wired into the bootstrap.
+**Partly implemented features.** Check before relying on these: PubSub and jobs have only in-memory implementations (the Valkey and PostgreSQL adapters are unfinished). The channel WebSocket upgrade and SMTP delivery are stubs. The TLS/HTTP2 config types are not wired into the bootstrap. Since 2.2 these stubs are `@available(*, deprecated)`, with messages saying what they do instead; keep Roost's own code from referencing them so the framework builds without warnings.
 
 ## Conventions
 
 - Tests use Swift Testing (`@Suite`, `@Test`, `#expect`), not XCTest.
+- Auth state lives under typed `AssignKey`s named after the 2.1 `AuthAssign` strings (`_roost_current_user`, …), because Nexus stores a typed assign under `String(describing:)` of its key type. Typed and string access share one slot until 3.0 removes `AuthAssign`.
 - A `roost_` prefix marks Roost's versions of things Nexus also provides, such as `roost_requestLogger` and `roost_csrfProtection`. It also marks internal helpers on Nexus types (`roost_recordingMatchedRoute`). Cross-module internals shared with `RoostTest` use `package` access.
 - Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, `ci:`, `refactor:`). `CHANGELOG.md` has one section per release, with an **Upgrade** subsection when apps need to change.
 - Release version numbers are hard-coded in prose across `README.md`, `Documentation/README.md`, `Sources/Roost/Roost.docc/*.md`, `website/index.html`, and `website/README.md`. Update them together.

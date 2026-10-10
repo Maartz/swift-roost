@@ -48,6 +48,56 @@ tests can sign a browser in without Roost's session keys.
 
   Tests no longer need Roost's private `_roost_auth_token` key.
 
+Contexts write typed changes and stay inside their owner's records. A model
+field is declared in its schema and in one permitted list, instead of in an
+input type, its normalization, an insert, and an update dictionary.
+
+- `Changes<Model>` holds the values to write to a model, each named by a key
+  path, so the compiler checks the property and the value's type.
+  `repo.update(_:id:_:)` writes them. Writes through `Changes` set an
+  `updatedAt` timestamp unless the changes set it.
+- `Permitted<Model>(\.title, \.url)` lists the fields a request may set.
+  `conn.permit(_:)` decodes them from forms and JSON into `Changes` and reports
+  every invalid field, not just the first. `FormValues.decode(_:)` does the
+  same outside a request.
+- `ValidatorRule` has key path rules for `Changes`, such as `.required(\.title)`
+  and `.length(\.note, max: 2000)`. They name each field after the schema
+  property instead of a repeated string.
+- `repo.scoped(\Bookmark.userId, to: owner)` returns a `ScopedRepo`, which
+  limits `query()`, `get`, `insert`, `update`, and `delete` to one owner's
+  records. Updates and deletes are single statements that match the primary key
+  and the owner, so a context doesn't read a record before changing it, and
+  they work inside `withTestRollback`. Another owner's record is a 404.
+- `AuthScope` has a `ScopeID` associated type, so `scopeId` can be a `UUID`.
+  Swift infers it from `scopeId`; existing `String` scopes are unchanged.
+- `conn.requireScope(_:)` returns the current scope or throws a 401.
+  `conn.authContext` reports whether the user signed in with a session or a
+  bearer token.
+- Roost stores authentication and the scope under typed assign keys. The
+  `AuthAssign` string keys still reach the same values.
+- The example app uses all of the above. `BookmarksContext` holds a
+  `ScopedRepo`, `ReaderScope` carries the reader's `UUID`, and
+  `Bookmark.editable` lists the editable fields once.
+- `DriftDetector`'s documentation and output no longer name `roost
+  db:schema:dump` or `roost db:drift`, which the CLI doesn't have.
+
+### Upgrade
+
+Apps compile unchanged, with deprecation warnings for:
+
+- `AuthAssign`. Read the state with `currentUser(_:)`, `authenticatedUserID`,
+  `authContext`, and `currentScope(_:)`. Roost 3.0 removes the string keys.
+- Features that aren't implemented: `ValkeyPubSub` and `PubSub.valkey(url:)`,
+  `JobQueue.postgres(spectro:)`, `PostgresJobStore`, `JobWorker`,
+  `SMTPDelivery`, `channel(_:)`, and `ServerConfig`'s `tls`, `http2`,
+  `TLSConfig`, and `validate()`. Each warning says what the feature does
+  instead: stop the process, do nothing, or go unused. Roost 3.0 removes them
+  from the stable API until they are implemented.
+
+Code that reads `scopeId` from an `any AuthScope` value now gets
+`(any Hashable & Sendable)?` instead of `String?`. Read it from the concrete
+scope type instead.
+
 ## 2.1.3
 
 `roost spectro` can show Spectro's colors, spinners, and styled tables again.

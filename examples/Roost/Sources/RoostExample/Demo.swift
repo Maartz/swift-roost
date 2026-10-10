@@ -7,7 +7,7 @@ func seedDemo(repo: any Repo) async throws {
     let (user, _) = try await AccountsContext(repo: repo).register(
         email: email, password: "Read-with-Roost-2026"
     )
-    let context = BookmarksContext(repo: repo)
+    let context = BookmarksContext(repo: repo, reader: ReaderScope(userID: user.id))
     let links: [(String, String, String, Bool)] = [
         ("A tour of Swift", "https://docs.swift.org/swift-book/documentation/the-swift-programming-language/guidedtour/",
          "Revisit the language, one small example at a time.", false),
@@ -19,8 +19,8 @@ func seedDemo(repo: any Repo) async throws {
          "The framework underneath this little reading list.", true),
     ]
     for (title, url, note, read) in links {
-        _ = try await context.createBookmark(
-            CreateBookmarkInput(title: title, url: url, note: note, read: read), scopeId: user.id
-        )
+        _ = try await context.createBookmark(Changes()
+            .setting(\.title, to: title).setting(\.url, to: url)
+            .setting(\.note, to: note).setting(\.read, to: read))
     }
 }
