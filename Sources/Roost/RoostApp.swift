@@ -32,8 +32,14 @@ public protocol RoostApp {
 
     /// Session store for server-side sessions. Return `nil` for apps that
     /// don't need sessions.
-    /// Default: `nil`. Override to use `MemorySessionStore()` or a custom store.
+    /// Default: `nil`. Override to use `KeyValueSessionStore()`, which keeps
+    /// sessions in ``store``, or another ``SessionStore``.
     var sessionStore: SessionStore? { get }
+
+    /// Where ``Nexus/Connection/store`` keeps values.
+    /// Default: ``StoreConfiguration/environment``, which reads
+    /// `ROOST_STORE_URL` and falls back to memory.
+    var store: StoreConfiguration { get }
 
     /// Shared layout applied by `conn.render`. Default: render the view alone.
     var layout: HTMLLayout? { get }
@@ -102,6 +108,8 @@ extension RoostApp {
 
     public var sessionStore: SessionStore? { nil }
 
+    public var store: StoreConfiguration { .environment }
+
     public var layout: HTMLLayout? { nil }
 
     public var pubSub: (any RoostPubSub)? { nil }
@@ -142,6 +150,9 @@ extension RoostApp {
             return
         }
 
+        // A store configuration error stops the app before it opens the database.
+        let store = try app.store.resolve(app: String(describing: Self.self), environment: Roost.env)
+
         // PubSub setup (call once to get a stable shared instance)
         let pubSubAdapter = app.pubSub
 
@@ -173,7 +184,7 @@ extension RoostApp {
         }
 
         let finalPlug = roost_applicationPipeline(
-            app, spectro: spectro, channels: channelRegistry,
+            app, spectro: spectro, store: store.store, channels: channelRegistry,
             jobs: jobQueueAdapter, pubSub: pubSubAdapter
         )
 
@@ -184,9 +195,11 @@ extension RoostApp {
         }
 
         let adapter = NexusHummingbirdAdapter(plug: finalPlug)
+        // The server stops accepting requests before the store's connections close.
         let server = Application(
             responder: adapter,
-            configuration: .init(address: .hostname(config.host, port: config.port))
+            configuration: .init(address: .hostname(config.host, port: config.port)),
+            services: store.services
         )
 
         do {

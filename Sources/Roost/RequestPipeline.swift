@@ -7,6 +7,7 @@ package func roost_applicationPipeline<App: RoostApp>(
     _ app: App,
     spectro: SpectroClient?,
     repository: (any Repo)? = nil,
+    store: any KeyValueStore,
     channels: ChannelRegistry,
     jobs: (any RoostJobQueue)?,
     pubSub: (any RoostPubSub)?
@@ -14,7 +15,9 @@ package func roost_applicationPipeline<App: RoostApp>(
     let router = Router { roost_recordingMatches(app.routes) }
     let layout = app.layout
     var plugs: [Plug] = [{ conn in
-        var result = conn.roost_recordingMatchedRoute().assign(ChannelRegistryKey.self, value: channels)
+        var result = conn.roost_recordingMatchedRoute()
+            .assign(ChannelRegistryKey.self, value: channels)
+            .assign(KeyValueStoreKey.self, value: store)
         if let layout { result = result.assign(HTMLLayoutKey.self, value: layout) }
         if let spectro { result = result.assign(SpectroKey.self, value: spectro) }
         if let repository { result = result.assign(RepositoryKey.self, value: repository) }
@@ -22,7 +25,9 @@ package func roost_applicationPipeline<App: RoostApp>(
         if let pubSub { result = result.assign(PubSubKey.self, value: pubSub) }
         return result
     }]
-    if let store = app.sessionStore { plugs.append(session(store: store)) }
+    if let sessions = app.sessionStore {
+        plugs.append(session(store: (sessions as? KeyValueSessionStore)?.using(store) ?? sessions))
+    }
     plugs += app.plugs
     plugs.append { conn in try await router(conn) }
     return roost_liveReload(roost_requestPipeline(plugs, customErrorPage: app.customErrorPage))

@@ -1,5 +1,37 @@
 # Changelog
 
+## 2.3.0 (unreleased)
+
+Apps have a key-value store, `conn.store`, kept in memory during development
+and on Valkey in production. One environment variable chooses between them.
+
+- `conn.store` reads and writes typed values through `StoreKey`s, each with
+  its own expiry: `get`, `set`, `remove`, `fetch` for caching, and an atomic
+  `increment` for counters.
+- `RoostApp.store` defaults to `.environment`. `ROOST_STORE_URL=valkey://…`
+  selects a Valkey or Redis server; without it the store is in memory, and in
+  production it logs a warning the first time it's used. `.memory`,
+  `.valkey(url:)`, `.persist(_:)` for a Hummingbird `PersistDriver`, and
+  `.custom(_:)` choose in code. Keys are prefixed with the app and
+  environment, such as `ReadingRoom:prod:`; `.namespaced(_:)` changes that.
+- The `Valkey` trait adds valkey-swift, the only new package an app
+  downloads; without the trait, nothing is fetched. Roost connects when the
+  server starts and closes the connections after it stops accepting requests.
+  While Valkey is unreachable, requests that use the store fail after two
+  seconds, then at once, and recover when it's back.
+- `KeyValueSessionStore()` keeps sessions in the store. Its values must be
+  strings, numbers, booleans, or arrays and dictionaries of those.
+- `MemoryKeyValueStore` encodes, expires, and increments values the way Valkey
+  does. `TestApp` gives each test app a fresh one, readable as `app.store`,
+  or takes one with `store:`.
+
+### Upgrade
+
+Nothing changes until an app uses `conn.store` or `KeyValueSessionStore`. To
+keep sessions across restarts and servers, enable the `Valkey` trait, set
+`ROOST_STORE_URL`, and replace `MemorySessionStore()` with
+`KeyValueSessionStore()`. On macOS, the Valkey client needs macOS 15 or later.
+
 ## Unreleased
 
 Your own errors can choose their response, and code outside a controller can

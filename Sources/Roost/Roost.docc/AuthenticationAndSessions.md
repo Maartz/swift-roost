@@ -11,7 +11,7 @@ session store; they do not replace credential validation in your application.
 ### Configure one session store
 
 ```swift
-let sessionStore: (any SessionStore)? = MemorySessionStore()
+let sessionStore: (any SessionStore)? = KeyValueSessionStore()
 
 var plugs: [Plug] {
     [requestId(), roost_requestLogger()] + browserPlugs()
@@ -26,9 +26,15 @@ To customize cookie name or TTL, install `session(store:cookieName:ttl:)`
 directly in `plugs` instead of configuring `sessionStore`. Choose one method.
 The defaults are `_roost_session` and 24 hours.
 
-``MemorySessionStore`` is process-local. Sessions disappear on restart and are
-not shared between replicas. Implement ``SessionStore`` when you need another
-persistence model.
+``KeyValueSessionStore`` keeps sessions in the app's key-value store. That
+store is in memory until you set `ROOST_STORE_URL`; with Valkey, sessions
+survive restarts and are shared between replicas. See <doc:KeyValueStores>.
+Session values must then be strings, numbers, booleans, or arrays and
+dictionaries of those.
+
+``MemorySessionStore`` is process-local and accepts any value. Sessions
+disappear on restart and are not shared between replicas. Implement
+``SessionStore`` when you need another persistence model.
 
 ### Generate browser authentication
 

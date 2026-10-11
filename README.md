@@ -110,6 +110,9 @@ Peregrine? Follow the [upgrade guide](guides/renaming-to-roost.md).
   with salted password hashing and revocable session tokens. Scoped resources
   check the authenticated owner on reads, updates, and deletes, and a
   `ScopedRepo` applies that check to every query and write of a context.
+- **Key-value stores.** `conn.store` keeps typed values, counters, caches, and
+  sessions in memory during development, and on Valkey in production once
+  `ROOST_STORE_URL` is set. Tests get a fresh memory store each.
 - **Tests close to the application.** Run the application pipeline in-process,
   keep cookies across requests, submit forms, and inject a transaction-owned
   repository for database isolation.
@@ -202,6 +205,11 @@ resolved versions until you run `swift package update`. To add the trait to an
 existing app, run `swift package update swift-roost` first, then add the trait
 and run `swift package resolve`: SwiftPM rejects a trait that the app's
 currently resolved release doesn't declare.
+
+From Roost 2.3, the `Valkey` trait lets the app's key-value store and sessions
+live on a Valkey or Redis server: add `"Valkey"` to the traits and set
+`ROOST_STORE_URL=valkey://…`. Without it, SwiftPM doesn't download the Valkey
+client. See the Key-value stores guide (`Sources/Roost/Roost.docc/KeyValueStores.md`).
 
 Framework contributors can optionally set `ROOST_FRAMEWORK_PATH` to a checkout.
 `ROOST_ECOSYSTEM_PATH` selects the parent of all four repositories; `ROOST_ESW_PATH`

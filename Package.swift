@@ -31,6 +31,9 @@ let package = Package(
         // `traits: [.defaults, "RichTerminal"]` on swift-roost, as `roost new` writes it.
         .trait(name: "RichTerminal",
                description: "Colors, spinners, prompts, and styled tables in `roost spectro`, from Spectro's Noora output."),
+        // Off by default, so apps without a Valkey store don't fetch valkey-swift.
+        .trait(name: "Valkey",
+               description: "A Valkey or Redis server as the app's key-value store: `ROOST_STORE_URL=valkey://…`."),
         .default(enabledTraits: []),
     ],
     dependencies: [
@@ -65,6 +68,15 @@ let package = Package(
             url: "https://github.com/apple/swift-log.git",
             from: "1.0.0"
         ),
+        // Used only with the `Valkey` trait. Its other dependencies are already in Roost's graph.
+        .package(
+            url: "https://github.com/valkey-io/valkey-swift.git",
+            from: "1.5.0"
+        ),
+        .package(
+            url: "https://github.com/apple/swift-nio-ssl.git",
+            from: "2.29.0"
+        ),
     ],
     targets: [
         .target(
@@ -81,6 +93,8 @@ let package = Package(
                 .product(name: "Metrics", package: "swift-metrics"),
                 .product(name: "Tracing", package: "swift-distributed-tracing"),
                 .product(name: "Logging", package: "swift-log"),
+                .product(name: "Valkey", package: "valkey-swift", condition: .when(traits: ["Valkey"])),
+                .product(name: "NIOSSL", package: "swift-nio-ssl", condition: .when(traits: ["Valkey"])),
             ]
         ),
         .target(
