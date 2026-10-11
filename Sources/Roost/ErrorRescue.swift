@@ -16,6 +16,29 @@ public typealias ErrorPageRenderer = @Sendable (
     _ message: String
 ) -> Connection?
 
+/// An error that knows the HTTP response it should get.
+///
+/// When a request throws one, Roost responds with ``httpError`` as if the
+/// handler had thrown that `NexusHTTPError`: with its status, and with its
+/// message in development. Conform the errors your own code throws, so they
+/// don't become 500s or need a `catch` in every handler.
+///
+/// ```swift
+/// enum OrderError: HTTPErrorConvertible {
+///     case soldOut
+///
+///     var httpError: NexusHTTPError {
+///         switch self {
+///         case .soldOut: NexusHTTPError(.conflict, message: "This item is sold out")
+///         }
+///     }
+/// }
+/// ```
+public protocol HTTPErrorConvertible: Error {
+    /// The error to respond with.
+    var httpError: NexusHTTPError { get }
+}
+
 /// Wraps a plug pipeline with environment-aware error handling.
 ///
 /// Compared to Nexus's basic `rescueErrors`:
@@ -23,6 +46,8 @@ public typealias ErrorPageRenderer = @Sendable (
 /// - Environment-aware: full detail in dev, generic in prod
 /// - Infrastructure error logging: always logs full error server-side
 /// - Custom error page support via optional renderer
+/// - Invalid input: an uncaught ``ValidationErrors`` responds 422, with the
+///   field errors as JSON for JSON requests, and the error page for others
 ///
 /// - Parameters:
 ///   - plug: The plug pipeline to wrap.
@@ -47,6 +72,10 @@ func roost_errorResponse(
     conn: Connection,
     customErrorPage: ErrorPageRenderer?
 ) -> Connection {
+    if let errors = error as? ValidationErrors {
+        return validationErrorResponse(errors, conn: conn, customErrorPage: customErrorPage)
+    }
+    let error = (error as? any HTTPErrorConvertible)?.httpError ?? error
     if let error = error as? NexusHTTPError {
         let statusCode = Int(error.status.code)
         let message = error.message.isEmpty
@@ -87,6 +116,32 @@ func roost_errorResponse(
 }
 
 // MARK: - Private
+
+/// An uncaught ``ValidationErrors`` is invalid input, so 422, never a 500. A
+/// request that sends or asks for JSON gets the field errors, the body
+/// `conn.json(status: .unprocessableContent, value: errors)` writes, so an API
+/// client reads the same errors from every handler. Any other request gets the
+/// error page, which lists the errors in development.
+private func validationErrorResponse(
+    _ errors: ValidationErrors,
+    conn: Connection,
+    customErrorPage: ErrorPageRenderer?
+) -> Connection {
+    if conn.isJSONRequest || !conn.prefersHTML,
+       let response = try? conn.json(status: .unprocessableContent, value: errors) {
+        return response.halted()
+    }
+    let messages = errors.fieldErrors.sorted { $0.key < $1.key }
+        .flatMap { field, messages in messages.map { "\(field): \($0)" } } + errors.modelErrors
+    return renderError(
+        conn: conn,
+        status: .unprocessableContent,
+        statusCode: 422,
+        errorType: "ValidationErrors",
+        message: messages.isEmpty ? reasonPhrase(for: 422) : messages.joined(separator: "; "),
+        customErrorPage: customErrorPage
+    ).halted()
+}
 
 private func renderError(
     conn: Connection,

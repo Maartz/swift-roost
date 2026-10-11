@@ -1,5 +1,53 @@
 # Changelog
 
+## Unreleased
+
+Your own errors can choose their response, and code outside a controller can
+read request bodies the way `conn.permit` does. Invalid input is a 422 wherever
+it's thrown, a unique violation is recognized inside a transaction too, and
+tests can sign a browser in without Roost's session keys.
+
+- An error that conforms to `HTTPErrorConvertible` gives the `NexusHTTPError`
+  to respond with, and Roost responds as if the handler had thrown that: with
+  its status, and its message in development. A domain error such as "sold out"
+  becomes a 409 instead of a 500, without a `catch` in every handler.
+
+  ```swift
+  enum OrderError: HTTPErrorConvertible {
+      case soldOut
+
+      var httpError: NexusHTTPError {
+          NexusHTTPError(.conflict, message: "This item is sold out")
+      }
+  }
+  ```
+
+- `conn.isJSONRequest` is public. It's `true` for a content type of
+  `application/json` or a `+json` type such as `application/vnd.api+json`, the
+  check `conn.permit` makes to choose between the body and the form fields.
+- `ValidationErrors(decodingError)` is public. It turns a `DecodingError` into
+  the field error `conn.permit` reports, such as `title: can't be blank`, and
+  throws a 400 when the error isn't about a field, such as a body that isn't
+  JSON.
+- An uncaught `ValidationErrors` responds 422, not 500. A request that sends or
+  asks for JSON gets the field errors as its body, the same body
+  `conn.json(status: .unprocessableContent, value: errors)` writes. Any other
+  request gets the error page, with 422, which lists the errors in development.
+  A handler only needs a `catch` to re-render its form.
+- `isUniqueConstraintViolation` recognizes PostgresNIO's `PostgresError`, which
+  Spectro's queries throw inside a transaction, also when it's wrapped in
+  Spectro's `queryExecutionFailed` and `transactionFailed`. It used to recognize
+  only `PSQLError`, so a registration racing another one with the same email
+  was a 500 instead of "Email is already taken".
+- RoostTest signs requests in with a session token:
+  - `browser.signIn(token:)`, or `browser.signIn(user, token:)`, stores the
+    token in the browser's session with its next request, as
+    `conn.loginUser(user, token:)` does, and keeps it for every later one;
+  - `TestSession.signedIn(token:)` is the session for a single request:
+    `app.get("/bookmarks", session: TestSession.signedIn(token: token))`.
+
+  Tests no longer need Roost's private `_roost_auth_token` key.
+
 ## 2.1.3
 
 `roost spectro` can show Spectro's colors, spinners, and styled tables again.
