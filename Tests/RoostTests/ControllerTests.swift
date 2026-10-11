@@ -252,6 +252,21 @@ struct PermittedParamsTests {
                                               headers: ["Content-Type": "application/json"])
         #expect(malformed.status == .badRequest)
     }
+
+    @Test("isJSONRequest is true for JSON and JSON-based content types only", arguments: [
+        ("application/json", true),
+        ("application/json; charset=utf-8", true),
+        ("application/vnd.api+json", true),
+        ("application/x-www-form-urlencoded", false),
+        (nil, false),
+    ] as [(String?, Bool)])
+    func jsonRequest(contentType: String?, expected: Bool) {
+        var fields = HTTPFields()
+        if let contentType { fields[.contentType] = contentType }
+        let request = HTTPRequest(method: .post, scheme: "http", authority: "localhost", path: "/recipes",
+                                  headerFields: fields)
+        #expect(Connection(request: request).isJSONRequest == expected)
+    }
 }
 
 /// Mixed-type JSON values for request bodies.

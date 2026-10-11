@@ -21,6 +21,12 @@ private struct BrowserWorkflowApp: RoostApp {
         GET("/read") { conn in
             try conn.json(value: ["count": String(conn.sessionValue("count") as? Int ?? 0), "name": conn.sessionValue("name") as? String ?? ""])
         }
+        GET("/session") { conn in
+            try conn.json(value: [
+                "token": conn.authSessionToken ?? "", "user": conn.authUserID ?? "",
+                "csrf": conn.getSession("_csrf_token") ?? "",
+            ])
+        }
     }
 }
 
@@ -66,6 +72,30 @@ struct BrowserWorkflowTests {
         let app = try await TestApp(BrowserWorkflowApp.self)
         let result = try await app.post("/form", json: ["title": "no token"])
         #expect(result.status == .forbidden)
+    }
+
+    @Test("A browser signs in with a session token, kept for its later requests and alongside its session")
+    func signIn() async throws {
+        let app = try await TestApp(BrowserWorkflowApp.self)
+        let browser = app.browser()
+        let csrf = try #require(try await browser.get("/form").json["csrf"] as? String)
+        #expect(try await browser.get("/session").json["token"] as? String == "")
+
+        await browser.signIn(token: "a-session-token")
+        let signedIn = try await browser.get("/session")
+        #expect(signedIn.json["token"] as? String == "a-session-token")
+        #expect(signedIn.json["csrf"] as? String == csrf)
+        #expect(try await browser.get("/session").json["token"] as? String == "a-session-token")
+        #expect(try await app.browser().get("/session").json["token"] as? String == "")
+
+        let other = app.browser()
+        await other.signIn(TestUser(id: "user-7"), token: "another-token")
+        let user = try await other.get("/session")
+        #expect(user.json["token"] as? String == "another-token")
+        #expect(user.json["user"] as? String == "user-7")
+
+        let request = try await app.get("/session", session: TestSession.signedIn(token: "a-request-token"))
+        #expect(request.json["token"] as? String == "a-request-token")
     }
 
     @Test("Nexus string values and Roost typed values use the same stored session")

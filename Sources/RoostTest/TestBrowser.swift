@@ -18,8 +18,30 @@ extension TestApp {
 public actor TestBrowser<App: RoostApp> {
     private let app: TestApp<App>
     private var cookies: [String: String] = [:]
+    /// Session values the next request stores, from ``signIn(token:)``.
+    private var pendingSession: [String: String] = [:]
 
     init(app: TestApp<App>) { self.app = app }
+
+    /// Signs the browser in with a session token, as `conn.loginUser(_:token:)`
+    /// would: the browser's next request stores the token in its session, so
+    /// that request and every later one carry it. The app's own plug, such as
+    /// one that finds the user from `conn.authSessionToken`, signs the user in.
+    ///
+    /// ```swift
+    /// let browser = app.browser()
+    /// await browser.signIn(token: token)   // a session token the app stored for the user
+    /// #expect(try await browser.get("/bookmarks").status == .ok)
+    /// ```
+    public func signIn(token: String) {
+        pendingSession.merge(TestSession.signedIn(token: token)) { $1 }
+    }
+
+    /// Signs the browser in as `user` with a session token, storing the user's
+    /// ``Authenticatable/authID`` too, as `conn.loginUser(user, token:)` does.
+    public func signIn(_ user: some Authenticatable, token: String) {
+        pendingSession.merge(TestSession.signedIn(user, token: token)) { $1 }
+    }
 
     public func get(_ path: String, headers: [String: String] = [:]) async throws -> TestResponse {
         try await request(method: .get, path: path, headers: headers)
@@ -34,7 +56,9 @@ public actor TestBrowser<App: RoostApp> {
     public func request(method: HTTPRequest.Method, path: String, body: Data? = nil, headers: [String: String] = [:]) async throws -> TestResponse {
         var headers = headers
         headers["Cookie"] = cookies.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: "; ")
-        let response = try await app.request(method: method, path: path, body: body, headers: headers)
+        let session = pendingSession.isEmpty ? nil : pendingSession
+        pendingSession = [:]
+        let response = try await app.request(method: method, path: path, body: body, headers: headers, session: session)
         for field in response.headers where field.name == .setCookie {
             let parts = field.value.split(separator: ";", omittingEmptySubsequences: false)
             guard let first = parts.first else { continue }
@@ -48,6 +72,25 @@ public actor TestBrowser<App: RoostApp> {
             }
         }
         return response
+    }
+}
+
+/// Sessions for the requests ``TestApp`` sends with `session:`.
+public enum TestSession {
+    /// A session signed in with `token`, as `conn.loginUser(_:token:)` leaves
+    /// it, without naming Roost's session keys.
+    ///
+    /// ```swift
+    /// let page = try await app.get("/bookmarks", session: TestSession.signedIn(token: token))
+    /// ```
+    public static func signedIn(token: String) -> [String: String] {
+        [sessionTokenKey: token]
+    }
+
+    /// A session signed in as `user` with `token`, with the user's
+    /// ``Authenticatable/authID`` too, as `conn.loginUser(user, token:)` leaves it.
+    public static func signedIn(_ user: some Authenticatable, token: String) -> [String: String] {
+        [sessionTokenKey: token, sessionUserIDKey: user.authID]
     }
 }
 

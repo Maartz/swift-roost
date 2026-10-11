@@ -23,11 +23,12 @@ public protocol Authenticatable: Sendable {
 
 // MARK: - Session Token Keys
 
-/// Session key where the auth token is stored.
-private let sessionTokenKey = "_roost_auth_token"
+/// Session key where the auth token is stored. RoostTest's `TestSession` signs
+/// test requests in with it.
+package let sessionTokenKey = "_roost_auth_token"
 
 /// Session key where the user ID is stored for quick access.
-private let sessionUserIDKey = "_roost_user_id"
+package let sessionUserIDKey = "_roost_user_id"
 
 // MARK: - Connection Extensions — Session Auth
 

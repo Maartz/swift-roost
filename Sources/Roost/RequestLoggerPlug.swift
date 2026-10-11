@@ -73,7 +73,7 @@ extension Connection {
         }
         var params = queryParams
         params.merge(bodyParams) { $1 }
-        if roost_isJSONRequest, case .buffered(let data) = requestBody,
+        if isJSONRequest, case .buffered(let data) = requestBody,
            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             for (key, value) in object {
                 params[key] = roost_filteredJSON(value, hidden: hidden)

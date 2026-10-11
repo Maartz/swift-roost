@@ -31,7 +31,7 @@ extension Connection {
     /// - Throws: ``ValidationErrors`` naming the first missing or invalid field.
     ///   A malformed JSON body throws `NexusHTTPError(.badRequest)`.
     public func permit<T: Decodable>(_ type: T.Type, decoder: JSONDecoder = JSONDecoder()) throws -> T {
-        guard roost_isJSONRequest else {
+        guard isJSONRequest else {
             var values = queryParams
             values.merge(bodyParams) { $1 }
             values.merge(params) { $1 }
@@ -47,16 +47,35 @@ extension Connection {
         }
     }
 
-    var roost_isJSONRequest: Bool {
+    /// Whether the request body is JSON: its content type is `application/json`,
+    /// or a JSON-based type such as `application/vnd.api+json`.
+    ///
+    /// ``permit(_:decoder:)`` decodes the body of a JSON request, and the
+    /// query, form, and path parameters of any other.
+    public var isJSONRequest: Bool {
         guard let type = request.headerFields[.contentType]?.lowercased() else { return false }
         return type.hasPrefix("application/json") || type.contains("+json")
     }
 }
 
 extension ValidationErrors {
-    /// Names the field a decoding error refers to. An error at the root means
-    /// the body itself is not the expected JSON, which is a bad request.
-    init(_ error: DecodingError) throws {
+    /// The field error a failed JSON decode stands for, as
+    /// ``Connection/permit(_:decoder:)`` reports it: "can't be blank" for a
+    /// missing or `null` value, and "is invalid" for a value of the wrong type or
+    /// format. A nested field is named by its path, such as `address.city`, and
+    /// an array element by its index, such as `tags.0`.
+    ///
+    /// ```swift
+    /// do {
+    ///     return try JSONDecoder().decode(Signup.self, from: data)
+    /// } catch let error as DecodingError {
+    ///     throw try ValidationErrors(error)
+    /// }
+    /// ```
+    ///
+    /// - Throws: `NexusHTTPError(.badRequest)` when the error isn't about a field:
+    ///   the data isn't JSON, or isn't the expected kind of value at the top level.
+    public init(_ error: DecodingError) throws {
         let path: [any CodingKey]
         let message: String
         let detail: String

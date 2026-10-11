@@ -104,6 +104,107 @@ struct ErrorRescueTests {
         #expect(result.isHalted)
     }
 
+    // MARK: - HTTPErrorConvertible
+
+    private enum OrderError: HTTPErrorConvertible {
+        case soldOut
+
+        var httpError: NexusHTTPError {
+            NexusHTTPError(.conflict, message: "This item is sold out")
+        }
+    }
+
+    @Test func convertibleErrorRendersItsHTTPError() async throws {
+        let plug = roost_rescueErrors { _ in
+            throw OrderError.soldOut
+        }
+        let conn = makeConn(accept: "application/json")
+        let result = try await plug(conn)
+
+        #expect(result.response.status == .conflict)
+        #expect(result.isHalted)
+
+        if case .buffered(let data) = result.responseBody {
+            let json = try JSONSerialization.jsonObject(with: data) as! [String: String]
+            #expect(json["status"] == "409")
+            #expect(json["message"] == "This item is sold out")
+        } else {
+            Issue.record("Expected buffered response body")
+        }
+    }
+
+    // MARK: - ValidationErrors
+
+    private var titleErrors: ValidationErrors {
+        var errors = ValidationErrors()
+        errors.add(field: "title", "can't be blank")
+        errors.add(field: "url", "is invalid")
+        return errors
+    }
+
+    @Test func validationErrorsRespond422WithTheFieldErrorsToJSON() async throws {
+        let errors = titleErrors
+        let plug = roost_rescueErrors { _ in throw errors }
+        let expected = try makeConn().json(status: .unprocessableContent, value: errors)
+
+        for accept in ["application/json", "application/json, text/html;q=0.5"] {
+            let result = try await plug(makeConn(accept: accept))
+            #expect(result.response.status == .unprocessableContent)
+            #expect(result.isHalted)
+            #expect(result.response.headerFields[.contentType] == "application/json")
+            guard case .buffered(let data) = result.responseBody,
+                  case .buffered(let body) = expected.responseBody else {
+                Issue.record("Expected buffered response bodies")
+                continue
+            }
+            #expect(data == body)
+            #expect(try JSONDecoder().decode(ValidationErrors.self, from: data) == errors)
+        }
+    }
+
+    @Test func validationErrorsRespondJSONToAJSONBodyWithoutAccept() async throws {
+        let errors = titleErrors
+        let plug = roost_rescueErrors { _ in throw errors }
+        var conn = makeConn()
+        conn.request.headerFields[.contentType] = "application/json"
+        let result = try await plug(conn)
+
+        #expect(result.response.status == .unprocessableContent)
+        if case .buffered(let data) = result.responseBody {
+            #expect(try JSONDecoder().decode(ValidationErrors.self, from: data) == errors)
+        } else {
+            Issue.record("Expected buffered response body")
+        }
+    }
+
+    @Test func validationErrorsRespond422WithTheErrorPageToBrowsers() async throws {
+        let errors = titleErrors
+        let plug = roost_rescueErrors { _ in throw errors }
+        let result = try await plug(makeConn(accept: "text/html"))
+
+        #expect(result.response.status == .unprocessableContent)
+        #expect(result.isHalted)
+        #expect(result.response.headerFields[.contentType] == "text/html; charset=utf-8")
+        if case .buffered(let data) = result.responseBody {
+            let body = String(decoding: data, as: UTF8.self)
+            #expect(body.contains("<!DOCTYPE html>"))
+            #expect(body.contains("ValidationErrors"))
+            #expect(body.contains("url: is invalid"))
+        } else {
+            Issue.record("Expected buffered response body")
+        }
+
+        let custom = roost_rescueErrors({ _ in throw errors }, customErrorPage: { conn, status, message in
+            conn.text("\(status) \(message)", status: .unprocessableContent)
+        })
+        let page = try await custom(makeConn(accept: "text/html"))
+        if case .buffered(let data) = page.responseBody {
+            #expect(String(decoding: data, as: UTF8.self) == "422 title: can't be blank; url: is invalid")
+        } else {
+            Issue.record("Expected buffered response body")
+        }
+    }
+
     // MARK: - Infrastructure Errors
 
     @Test func infrastructureErrorReturns500() async throws {
