@@ -119,6 +119,24 @@ In production, an app without `ROOST_STORE_URL` keeps its store in memory and
 logs a warning the first time it uses it: its values are lost on restart and
 aren't shared between instances.
 
+### Share rate limits between servers
+
+``rateLimit(max:windowSeconds:by:message:name:fileID:line:)`` counts requests
+in the app's store, so with Valkey a limit of 100 requests a minute is 100 for
+the whole app, not for each instance:
+
+```swift
+var plugs: [Plug] {
+    [rateLimit(max: 100, windowSeconds: 60)] + browserPlugs()
+}
+```
+
+The window slides, so a client can't send twice the limit around the moment
+one window ends and the next begins. Limits created at the same place in the
+code share counters; pass `name:` to keep two of them apart. If the store
+fails, requests are allowed and the error is logged, so a Valkey outage
+doesn't take the app down.
+
 ### Choose the store in code
 
 ``RoostApp/store`` defaults to ``StoreConfiguration/environment``. Override it

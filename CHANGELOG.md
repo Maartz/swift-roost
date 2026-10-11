@@ -24,6 +24,14 @@ and on Valkey in production. One environment variable chooses between them.
 - `MemoryKeyValueStore` encodes, expires, and increments values the way Valkey
   does. `TestApp` gives each test app a fresh one, readable as `app.store`,
   or takes one with `store:`.
+- `rateLimit(max:windowSeconds:)` counts requests in `conn.store`, so with
+  Valkey a limit applies to the whole app instead of each instance. Its
+  window slides, instead of starting at each client's first request, so a
+  client can't send twice the limit around the end of a window. If the store
+  fails, requests are allowed and the error is logged at most once a minute;
+  a store without atomic counters falls back to each process's memory.
+- `rateLimit(by: .ip)` uses the socket address when a request has neither
+  `X-Forwarded-For` nor `X-Real-IP`. Before, such requests weren't limited.
 
 ### Upgrade
 
@@ -31,6 +39,13 @@ Nothing changes until an app uses `conn.store` or `KeyValueSessionStore`. To
 keep sessions across restarts and servers, enable the `Valkey` trait, set
 `ROOST_STORE_URL`, and replace `MemorySessionStore()` with
 `KeyValueSessionStore()`. On macOS, the Valkey client needs macOS 15 or later.
+
+Rate limits change in two ways:
+
+- Limits created at the same place in the code share counters, such as two
+  limits made by one helper function. Pass `name:` to keep them apart.
+- An app that receives requests directly, without a proxy, is now limited
+  by each client's socket address.
 
 ## Unreleased
 
