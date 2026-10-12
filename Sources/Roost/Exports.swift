@@ -5,3 +5,4 @@
 @_exported import NexusHummingbird
 @_exported import NexusRouter
 @_exported import Spectro
+@_exported import SpectroMigrations

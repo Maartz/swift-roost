@@ -271,8 +271,9 @@ browser tests, and migrations in more detail.
 Migration commands use **Spectro's migration manager**, through Roost's application
 configuration. SQL files live in `Sources/Migrations/`, with `-- migrate:up`
 and `-- migrate:down` sections. Spectro applies them transactionally and records
-their versions in `schema_migrations`. The reading-list example follows this
-same path.
+their versions in `schema_migrations`. An app can also declare a
+`MigrationRegistry` that adds Swift migrations to that SQL history; the
+reading-list example does.
 
 ## The stack
 

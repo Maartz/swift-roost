@@ -78,6 +78,12 @@ input type, its normalization, an insert, and an update dictionary.
 - The example app uses all of the above. `BookmarksContext` holds a
   `ScopedRepo`, `ReaderScope` carries the reader's `UUID`, and
   `Bookmark.editable` lists the editable fields once.
+- `RoostApp.migrations` takes a `MigrationRegistry` of Swift migrations and
+  bundled SQL history, from Spectro's `SpectroMigrations`, which `import Roost`
+  now includes. `App migrate` and `roost migrate` then run it through Spectro's
+  migration command, and `App migrate plan` prints the SQL without a database.
+  `down` still rolls back one migration unless given `--step`. Apps without a
+  registry keep running `Sources/Migrations/`.
 - `DriftDetector`'s documentation and output no longer name `roost
   db:schema:dump` or `roost db:drift`, which the CLI doesn't have.
 

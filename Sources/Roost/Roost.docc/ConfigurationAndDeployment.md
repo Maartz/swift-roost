@@ -61,6 +61,8 @@ export DB_NAME=reading_room
 Run migrations explicitly before starting the app. Ship `Public/` and
 `Sources/Migrations/` with the executable and run from the directory containing
 them. Preserve any additional SwiftPM resource bundles your application uses.
+An app with a ``RoostApp/migrations`` registry carries its SQL history in its
+resource bundle instead of `Sources/Migrations/`.
 
 `roost gen dockerfile` creates a Swift 6.3.3 build stage and matching slim
 runtime, installs Linux zlib dependencies, and copies the public assets and

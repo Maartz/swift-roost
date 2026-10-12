@@ -152,11 +152,52 @@ roost gen migration create_reading_tags
 Fill in both sections of the generated file. Spectro applies each migration
 transactionally and tracks its version in `schema_migrations`.
 
-The forthcoming Spectro 2.1 offers Swift declarations through the optional
-`SpectroMigrations` product. Roost's generators and `RoostMigrator` continue
-to use Spectro's SQL workflow. To opt into Swift declarations, add the separate
-migration executable described in [Spectro's migration guide](https://github.com/roost-framework/Spectro/blob/4a75b08911b41cbbd3feb724c8527a32f98b16b6/docs/MIGRATIONS.md).
-Keep the IDs and SQL history of migrations already applied to your database.
+### Write migrations in Swift
+
+An app can declare its history as a `MigrationRegistry` from Spectro's
+`SpectroMigrations` module, which `import Roost` includes. List the SQL
+history and the Swift migrations in ``RoostApp/migrations``:
+
+```swift
+var migrations: MigrationRegistry? {
+    MigrationRegistry {
+        SQLMigrations(bundle: .module, directory: "SQL")
+        AddReadAtToBookmarks()
+    }
+}
+```
+
+Move the SQL files into the app target, unchanged, and bundle them with
+`resources: [.copy("Migrations/SQL")]` in `Package.swift`. Their IDs stay the
+same, so a database that already applied them doesn't run them again. Then
+declare new changes in Swift:
+
+```swift
+struct AddReadAtToBookmarks: Migration {
+    static let id = "1791704720_add_read_at_to_bookmarks"
+
+    var change: MigrationPlan {
+        AlterTable("bookmarks") { table in
+            table.add("read_at", .timestamptz)
+        }
+        CreateIndex("bookmarks_user_id_read_at_index", on: "bookmarks", columns: ["user_id", "read_at"])
+    }
+}
+```
+
+Spectro derives the rollback: this one drops the index, then the column.
+Use `Reversible` for a change it can't invert, `SQL(up:down:)` for anything
+outside the typed operations, and `Irreversible` for a change that loses data.
+[Spectro's migration guide](https://github.com/roost-framework/Spectro/blob/2.3.0/docs/MIGRATIONS.md)
+covers every operation.
+
+With a registry, `App migrate` runs Spectro's migration command, and
+`roost migrate up`, `down`, and `status` keep working. `App migrate plan`
+prints the SQL of every migration without connecting to a database;
+`plan --direction down` prints the rollbacks. `down` rolls back only the
+newest migration unless you pass `--step`. `roost gen migration` still writes
+SQL to `Sources/Migrations/`, which a registry doesn't read: write Swift
+migrations by hand for now.
 
 ### Run against the app's configuration
 
