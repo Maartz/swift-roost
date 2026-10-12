@@ -1,6 +1,6 @@
 <article class="detail">
     <a class="back-link" href="/bookmarks">← Your reading queue</a>
-    <p class="eyebrow"><%= bookmark.read ? "Finished reading" : "Saved for later" %> · <%= bookmark.domain %></p>
+    <p class="eyebrow"><%= status %> · <%= bookmark.domain %></p>
     <h1><%= bookmark.title %></h1>
     <a class="destination" href="<%= bookmark.url %>" target="_blank" rel="noopener noreferrer"><%= bookmark.url %> ↗<span class="sr-only"> (opens in a new tab)</span></a>
     <% if !bookmark.note.isEmpty { %><div class="saved-note"><p class="eyebrow">Your note</p><p><%= bookmark.note %></p></div><% } %>

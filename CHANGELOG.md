@@ -84,6 +84,10 @@ input type, its normalization, an insert, and an update dictionary.
   migration command, and `App migrate plan` prints the SQL without a database.
   `down` still rolls back one migration unless given `--step`. Apps without a
   registry keep running `Sources/Migrations/`.
+- The example app bundles its generated SQL and adds three Swift migrations:
+  a `read_at` column the database keeps in step with `read`, an index that
+  matches the reading queue's query, and a check that links are http or https.
+  The details page shows when a link was finished.
 - `DriftDetector`'s documentation and output no longer name `roost
   db:schema:dump` or `roost db:drift`, which the CLI doesn't have.
 

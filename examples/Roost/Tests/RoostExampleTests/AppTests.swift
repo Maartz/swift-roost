@@ -71,6 +71,13 @@ func bookmarkTemplateViews() async throws {
     #expect(try rendered(BookmarkShowView(bookmark: bookmark)).contains("name=\"_method\" value=\"DELETE\""))
     #expect(try rendered(BookmarksIndexView(bookmarks: [bookmark])).contains(conn.csrfToken))
     #expect(BookmarksIndexView(bookmarks: [bookmark], filter: .finished).visible.isEmpty)
+    #expect(BookmarkShowView(bookmark: bookmark).status == "Saved for later")
+    var finished = bookmark
+    finished.read = true
+    #expect(BookmarkShowView(bookmark: finished).status == "Finished reading")
+    finished.readAt = Date(timeIntervalSince1970: 1_791_704_720)
+    #expect(BookmarkShowView(bookmark: finished).status.hasPrefix("Finished "))
+    #expect(BookmarkShowView(bookmark: finished).status != "Finished reading")
     let retry = BookmarkEditView(bookmark: bookmark, values: ["title": "Unsubmitted value"])
     #expect(retry.values["title"] == "Unsubmitted value")
 }
