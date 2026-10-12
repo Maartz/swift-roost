@@ -18,10 +18,11 @@ Spectro 2.x starting at 2.3.0, and ESW 1.6.0. ESW's release includes typed views
 output. Roost 2.0.0 is the first release with the renamed modules and CLI;
 follow <doc:GettingStarted> to create an app using released dependencies.
 
-The detailed acceptance record is kept in `guides/dx-acceptance.md` in the
-checkout. Each record identifies the dependency revisions, platform, and
-verification performed. A documentation build does not rerun that acceptance
-workflow or establish production readiness.
+The acceptance check in [roost-cli](https://github.com/roost-framework/roost-cli)
+generates an app, migrates an isolated PostgreSQL database, runs the app's tests,
+and exercises authentication, HTML, JSON, and two-user ownership over HTTP. CI
+runs it on Linux against published companion packages. A documentation build
+does not run that check or establish production readiness.
 
 ### Service implementation status
 

@@ -92,6 +92,7 @@ in the navigator. Rebuild after changing symbol links or signatures.
 
 Keep examples aligned with the generators and actual request lifecycle. State
 when an example needs PostgreSQL, a generated model, a session store, or a local
-dependency override. Use the [acceptance record](../guides/dx-acceptance.md) for
-framework verification; a successful documentation build validates neither
+dependency override. Use `swift test` and the
+[generated-app acceptance check](../README.md#testing) for framework
+verification; a successful documentation build validates neither
 database workflows nor network transports.
