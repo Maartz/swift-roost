@@ -171,6 +171,9 @@ struct KeyValueStoreConformanceTests {
             _ = try await store.increment("big", by: .max, expiringAfter: nil)
             await #expect(performing: { try await store.increment("big", by: 1, expiringAfter: nil) },
                           throws: kind(.overflow))
+            // With an expiry, Valkey runs the increment in a transaction, which reports errors its own way.
+            await #expect(performing: { try await store.increment("big", by: 1, expiringAfter: .seconds(60)) },
+                          throws: kind(.overflow))
         }
     }
 
@@ -179,6 +182,8 @@ struct KeyValueStoreConformanceTests {
         try await backend.withStore { store in
             try await store.set("text", to: Data("hello".utf8), expiringAfter: nil)
             await #expect(performing: { try await store.increment("text", by: 1, expiringAfter: nil) },
+                          throws: kind(.undecodable))
+            await #expect(performing: { try await store.increment("text", by: 1, expiringAfter: .seconds(60)) },
                           throws: kind(.undecodable))
         }
     }
@@ -306,9 +311,18 @@ struct StoreConfigurationTests {
         ("redis://:s%40cret@10.0.0.5", .init(host: "10.0.0.5", port: 6379, username: nil, password: "s@cret", database: 0, tls: false)),
         ("rediss://app:pw@host:7000/", .init(host: "host", port: 7000, username: "app", password: "pw", database: 0, tls: true)),
         ("valkey://:100%25@host", .init(host: "host", port: 6379, username: nil, password: "100%", database: 0, tls: false)),
+        ("valkeys://[::1]:6380", .init(host: "::1", port: 6380, username: nil, password: nil, database: 0, tls: true)),
     ])
     func validURLs(string: String, expected: ValkeyURL.Fields) throws {
         #expect(try ValkeyURL(string).fields == expected)
+    }
+
+    @Test("TLS names the server only when the host is a name, not an address")
+    func serverNames() throws {
+        #expect(try !ValkeyURL("valkeys://cache.internal").hostIsIPAddress)
+        #expect(try !ValkeyURL("valkeys://10.0.0.5.example").hostIsIPAddress)
+        #expect(try ValkeyURL("valkeys://10.0.0.5").hostIsIPAddress)
+        #expect(try ValkeyURL("valkeys://[2001:db8::1]").hostIsIPAddress)
     }
 
     @Test("Invalid store URLs are configuration errors", arguments: [
@@ -355,6 +369,16 @@ struct StoreConfigurationTests {
         _ = try await implicit.get(.visits)
         #expect(capture.messages.count == 1)
         #expect(capture.messages.first?.contains("ROOST_STORE_URL") == true)
+
+        // Rate limits count in their own memory instead, as before 2.3, without the warning.
+        let limited = LogCapture()
+        let fallback = try StoreConfiguration.environment
+            .resolve(app: "ReadingRoom", environment: .prod, variables: [:], logger: limited.logger).store
+        let plug = rateLimit(max: 1, windowSeconds: 60, by: .header(.authorization))
+        let conn = TestConnection.build(headers: [.authorization: "a"]).assign(KeyValueStoreKey.self, value: fallback)
+        #expect(try await !plug(conn).isHalted)
+        #expect(try await plug(conn).isHalted)
+        #expect(limited.messages.isEmpty)
 
         let declared = LogCapture()
         let memory = try StoreConfiguration.memory
@@ -471,7 +495,8 @@ struct KeyValueSessionStoreTests {
     @Test("A session in another format reads as expired")
     func corrupted() async throws {
         let store = MemoryKeyValueStore()
-        await store.set("session:id", to: Data("{not json".utf8), expiringAfter: nil)
+        await store.set(KeyValueSessionStore.key("id"), to: Data("{not json".utf8), expiringAfter: nil)
+        #expect(await store.get(KeyValueSessionStore.key("id")) != nil)
         #expect(try await KeyValueSessionStore(store).get("id") == nil)
     }
 
@@ -580,7 +605,9 @@ struct KeyValueStoreRequestTests {
     }
 
     @Test("A connection without a store throws instead of stopping the process")
-    func connectionWithoutStore() async {
+    func connectionWithoutStore() async throws {
         await #expect(performing: { try await TestConnection.build().store.get("key") }, throws: kind(.misconfigured))
+        let assigned = TestConnection.build().assign(KeyValueStoreKey.self, value: MemoryKeyValueStore())
+        #expect(try await assigned.store.get("key") == nil)
     }
 }

@@ -26,7 +26,8 @@ struct ValkeyURL: Equatable {
         guard let host = components.host, !host.isEmpty else {
             throw KeyValueStoreError(.misconfigured, "The store URL \(Self.redacted(string)) has no host")
         }
-        self.host = host
+        // URLComponents keeps the brackets of an IPv6 address, which name resolution rejects.
+        self.host = host.hasPrefix("[") && host.hasSuffix("]") ? String(host.dropFirst().dropLast()) : host
         self.port = components.port ?? 6379
         // URLComponents decodes percent-escapes in the user and password.
         self.username = components.user.flatMap { $0.isEmpty ? nil : $0 }
@@ -40,6 +41,14 @@ struct ValkeyURL: Equatable {
         } else {
             throw KeyValueStoreError(.misconfigured, "The store URL path names a database number, not \(path)")
         }
+    }
+
+    /// `true` when ``host`` is an IPv4 or IPv6 address rather than a name.
+    /// TLS can't send an address as the server name (SNI).
+    var hostIsIPAddress: Bool {
+        if host.contains(":") { return true }
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+        return parts.count == 4 && parts.allSatisfy { UInt8($0) != nil }
     }
 
     /// The URL without its credentials, for error messages and logs: whatever
@@ -63,13 +72,20 @@ struct ValkeyKeyValueStore: KeyValueStore {
     /// instead of waiting for valkey-swift's 60-second default.
     static let circuitBreakerTripAfter: Duration = .seconds(2)
 
+    /// How long a command waits for a reply from a server that is reachable
+    /// but not answering, such as one paused during a failover, instead of
+    /// valkey-swift's 30-second default. The circuit breaker only covers
+    /// connections that can't be opened.
+    static let commandTimeout: Duration = .seconds(2)
+
     init(url: ValkeyURL, logger: Logger) throws {
         var configuration = ValkeyClientConfiguration(
             authentication: url.password.map { .init(username: url.username ?? "default", password: $0) },
-            tls: url.tls ? try .enable(.makeClientConfiguration(), tlsServerName: url.host) : .disable,
+            tls: url.tls ? try .enable(.makeClientConfiguration(), tlsServerName: url.hostIsIPAddress ? nil : url.host) : .disable,
             databaseNumber: url.database
         )
         configuration.connectionPool.circuitBreakerTripAfter = Self.circuitBreakerTripAfter
+        configuration.commandTimeout = Self.commandTimeout
         client = ValkeyClient(.hostname(url.host, port: url.port), configuration: configuration, logger: logger)
     }
 

@@ -55,8 +55,12 @@ across servers, and a new counter starts its expiry when it's created.
 stored value of an older type counts as missing.
 
 Every request a Roost app or `TestApp` handles has a store. A connection built
-another way, such as one a plug's unit test makes, has none until you assign
-one, and `conn.store` throws.
+another way, such as one a plug's unit test makes, has none, and `conn.store`
+throws until you assign one with ``KeyValueStoreKey``:
+
+```swift
+let conn = TestConnection.build().assign(KeyValueStoreKey.self, value: MemoryKeyValueStore())
+```
 
 Contexts take `any KeyValueStore`, as they take `any Repo`, so a test can pass
 its own ``MemoryKeyValueStore``:
@@ -118,9 +122,11 @@ messages hide the credentials either way. On macOS, the Valkey client needs
 macOS 15 or later; Linux has no such requirement.
 
 Roost connects when the server starts and closes the connections after the
-server stops accepting requests. If Valkey becomes unreachable, the first
-request that uses the store fails after two seconds, the next ones fail at
-once, and the store recovers by itself when Valkey is back.
+server stops accepting requests. If Valkey becomes unreachable or stops
+answering, such as during a failover, the first request that uses the store
+fails within a few seconds: a command waits two seconds for a reply, and a
+connection two seconds to open. The next ones fail at once, and the store
+recovers by itself when Valkey is back.
 
 Roost prefixes every key with the app's type name and the environment, such
 as `ReadingRoom:prod:`, so several apps and environments can share a server.
@@ -199,6 +205,7 @@ that conforms to `Service` runs with the server. Pass it to
 - ``KeyValueStore``
 - ``StoreKey``
 - ``Nexus/Connection/store``
+- ``KeyValueStoreKey``
 
 ### Configuration
 

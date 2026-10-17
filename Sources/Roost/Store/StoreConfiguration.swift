@@ -47,8 +47,9 @@ public struct StoreConfiguration: Sendable {
     ///          traits: [.defaults, "Valkey"])
     /// ```
     ///
-    /// While the server is unreachable, requests that use the store fail
-    /// after two seconds, then immediately, and recover once it's back.
+    /// While the server is unreachable or stops answering, such as during a
+    /// failover, requests that use the store fail within a few seconds, then
+    /// immediately, and recover once it's back.
     public static func valkey(url: String) -> StoreConfiguration {
         .init(backend: .valkey(url), namespace: nil)
     }
@@ -130,6 +131,14 @@ extension StoreConfiguration {
             traits: [.defaults, "Valkey"]
             """)
         #endif
+    }
+}
+
+extension KeyValueStore {
+    /// `true` for the memory store ``StoreConfiguration/environment`` falls
+    /// back to in production, which warns on first use.
+    var roost_isImplicitProductionMemory: Bool {
+        ((self as? NamespacedStore)?.base ?? self) is ProductionMemoryStore
     }
 }
 

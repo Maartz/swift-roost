@@ -17,8 +17,9 @@ and on Valkey in production. One environment variable chooses between them.
 - The `Valkey` trait adds valkey-swift, the only new package an app
   downloads; without the trait, nothing is fetched. Roost connects when the
   server starts and closes the connections after it stops accepting requests.
-  While Valkey is unreachable, requests that use the store fail after two
-  seconds, then at once, and recover when it's back. Redis works from 6.2.
+  While Valkey is unreachable or stops answering, requests that use the store
+  fail within a few seconds, then at once, and recover when it's back. Redis
+  works from 6.2.
   Error messages hide the URL's credentials, also in a URL that can't be
   parsed.
 - `conn.store` throws for a connection that has no store, such as one a
@@ -46,7 +47,9 @@ and on Valkey in production. One environment variable chooses between them.
 
 ### Upgrade
 
-Nothing changes until an app uses `conn.store` or `KeyValueSessionStore`. To
+Nothing changes until an app uses `conn.store` or `KeyValueSessionStore`;
+without `ROOST_STORE_URL`, rate limits count in each process's memory, as
+before, and don't log the production memory warning. To
 keep sessions across restarts and servers, enable the `Valkey` trait, set
 `ROOST_STORE_URL`, and replace `MemorySessionStore()` with
 `KeyValueSessionStore()`. On macOS, the Valkey client needs macOS 15 or later.

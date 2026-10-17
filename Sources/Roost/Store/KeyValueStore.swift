@@ -167,8 +167,14 @@ public struct KeyValueStoreError: Error, Sendable, CustomStringConvertible {
 
 // MARK: - Connection
 
-enum KeyValueStoreKey: AssignKey {
-    typealias Value = any KeyValueStore
+/// The store behind ``Nexus/Connection/store``. Roost and `TestApp` assign
+/// it; assign one yourself to test a plug on a connection you build:
+///
+/// ```swift
+/// let conn = TestConnection.build().assign(KeyValueStoreKey.self, value: MemoryKeyValueStore())
+/// ```
+public enum KeyValueStoreKey: AssignKey {
+    public typealias Value = any KeyValueStore
 }
 
 extension Connection {
@@ -182,13 +188,14 @@ extension Connection {
     ///
     /// - Throws: ``KeyValueStoreError/Kind/misconfigured`` for a connection
     ///   that didn't come through a Roost app or `TestApp`, such as one a
-    ///   plug's unit test builds, until it's given a store.
+    ///   plug's unit test builds, until ``KeyValueStoreKey`` is assigned.
     public var store: any KeyValueStore {
         get throws {
             guard let store = self[KeyValueStoreKey.self] else {
                 throw KeyValueStoreError(.misconfigured, """
                     This connection has no key-value store. RoostApp and TestApp set conn.store; \
-                    a connection built another way needs one assigned.
+                    on a connection built another way, assign one: \
+                    conn.assign(KeyValueStoreKey.self, value: MemoryKeyValueStore())
                     """)
             }
             return store

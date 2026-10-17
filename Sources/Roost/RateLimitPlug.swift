@@ -98,8 +98,11 @@ func roost_rateLimit(
 
         let counts: RateLimitWindow.Counts
         do {
+            // Without ROOST_STORE_URL in production, count in this process's memory, as
+            // before 2.3, without the warning meant for apps that use conn.store.
+            let appStore = conn[KeyValueStoreKey.self].flatMap { $0.roost_isImplicitProductionMemory ? nil : $0 }
             // After a store says it can't count atomically, don't ask it again.
-            let store = warnings.storeIsUnsupported ? fallback : conn[KeyValueStoreKey.self] ?? fallback
+            let store = warnings.storeIsUnsupported ? fallback : appStore ?? fallback
             counts = try await window.count(client, at: time, in: store)
         } catch let error as KeyValueStoreError where error.kind == .unsupported {
             warnings.unsupported(error)
