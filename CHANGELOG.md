@@ -94,7 +94,7 @@ input type, its normalization, an insert, and an update dictionary.
 
 ### Upgrade
 
-Apps compile unchanged, with deprecation warnings for:
+Most apps compile unchanged, with deprecation warnings for:
 
 - `AuthAssign`. Read the state with `currentUser(_:)`, `authenticatedUserID`,
   `authContext`, and `currentScope(_:)`. Roost 3.0 removes the string keys.
@@ -108,6 +108,14 @@ Apps compile unchanged, with deprecation warnings for:
 Code that reads `scopeId` from an `any AuthScope` value now gets
 `(any Hashable & Sendable)?` instead of `String?`. Read it from the concrete
 scope type instead.
+
+`import Roost` now includes SpectroMigrations, whose public names include
+`Migration`, `SQL`, `CreateTable`, `AlterTable`, `DropTable`, `CreateIndex`,
+`Reversible`, and `Irreversible`. A type the app declares in its own module
+takes precedence and needs no change. A file that imports Roost and another
+module, such as a package of the app's or a dependency, that declares one of
+these names reports "ambiguous use"; qualify the name with its module, such as
+`AppCore.Migration`.
 
 ## 2.1.3
 
