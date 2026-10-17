@@ -62,7 +62,10 @@ Run migrations explicitly before starting the app. Ship `Public/` and
 `Sources/Migrations/` with the executable and run from the directory containing
 them. Preserve any additional SwiftPM resource bundles your application uses.
 An app with a ``RoostApp/migrations`` registry carries its SQL history in its
-resource bundle instead of `Sources/Migrations/`.
+resource bundle instead of `Sources/Migrations/`: ship the
+`<Package>_<Target>.resources` directory (`.bundle` on macOS) that SwiftPM
+builds next to the executable, or `App migrate` stops with "unable to find
+bundle". The Dockerfile `roost gen dockerfile` writes doesn't copy it yet.
 
 `roost gen dockerfile` creates a Swift 6.3.3 build stage and matching slim
 runtime, installs Linux zlib dependencies, and copies the public assets and

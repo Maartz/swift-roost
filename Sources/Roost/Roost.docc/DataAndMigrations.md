@@ -167,6 +167,9 @@ var migrations: MigrationRegistry? {
 }
 ```
 
+Keep the `?`: a property of type `MigrationRegistry` doesn't implement the
+requirement, and `App migrate` would keep running `Sources/Migrations/`.
+
 Move the SQL files into the app target, unchanged, and bundle them with
 `resources: [.copy("Migrations/SQL")]` in `Package.swift`. Their IDs stay the
 same, so a database that already applied them doesn't run them again. Then
@@ -226,6 +229,9 @@ A compiled application also accepts the migration command:
 ROOST_ENV=prod DB_NAME=reading_room .build/release/ReadingRoom migrate up
 ```
 
-Supply the target database credentials in the environment. Run from the
+Supply the target database credentials in the environment. An app with a
+registry reads its SQL from its resource bundle: ship the
+`<Package>_<Target>.resources` directory (`.bundle` on macOS) from
+`.build/release` beside the executable. Without a registry, run from the
 application directory, or ship `Sources/Migrations/` beside the executable.
 See <doc:ConfigurationAndDeployment> and <doc:TestingYourApp>.

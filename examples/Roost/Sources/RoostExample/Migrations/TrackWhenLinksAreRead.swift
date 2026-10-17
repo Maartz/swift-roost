@@ -33,10 +33,11 @@ struct TrackWhenLinksAreRead: Migration {
             down: "DROP FUNCTION bookmarks_track_read_at()"
         )
 
+        // Every update, not only of `read`, so writing `read_at` directly can't break the pairing.
         SQL(
             up: """
                 CREATE TRIGGER bookmarks_track_read_at
-                BEFORE INSERT OR UPDATE OF read ON bookmarks
+                BEFORE INSERT OR UPDATE ON bookmarks
                 FOR EACH ROW EXECUTE FUNCTION bookmarks_track_read_at()
                 """,
             down: "DROP TRIGGER bookmarks_track_read_at ON bookmarks"

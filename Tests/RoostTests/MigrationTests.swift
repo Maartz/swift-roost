@@ -649,6 +649,17 @@ struct MigrationRegistryCommandTests {
         #expect(throws: (any Error).self) { try RegistryApp.registryArguments(["down", "--step=2", "--all"]) }
     }
 
+    @Test("Roost's note comes with every form of help Spectro prints")
+    func helpRequests() throws {
+        for arguments in [[], ["help"], ["--help"], ["down", "-h"], ["down", "-help"], ["status", "--help"]] {
+            #expect(RegistryApp.asksForHelp(arguments), "\(arguments)")
+        }
+        for arguments in [["up"], ["down"], ["down", "--step", "2"], ["plan", "--direction", "down"]] {
+            #expect(!RegistryApp.asksForHelp(arguments), "\(arguments)")
+        }
+        #expect(try RegistryApp.registryArguments(["down", "-help"]) == ["down", "-help"])
+    }
+
     @Test("down --all --step is a usage error, before any database connection")
     func downAllWithStepIsAUsageError() async throws {
         #expect(try await RegistryApp().runMigrationCommand(["down", "--all", "--step", "2"]) == 64)

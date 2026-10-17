@@ -46,8 +46,11 @@ to try to bypass the browser pipeline.
 
 Check the server, role, password, and selected database. An explicit `DB_NAME`
 overrides environment suffixes, including in tests. Create the database before
-running migrations, then inspect `roost migrate status`. Migration files are
-resolved from `Sources/Migrations/` relative to the app's working directory.
+running migrations, then inspect `roost migrate status`. Without a
+``RoostApp/migrations`` registry, migration files are resolved from
+`Sources/Migrations/` relative to the app's working directory. With one, they
+are in the app's resource bundle, and a release binary copied without it
+stops with "unable to find bundle".
 
 ### A request test works once and then fails
 

@@ -27,6 +27,10 @@ public protocol RoostApp {
     /// }
     /// ```
     ///
+    /// Declare it optional, as above. A property of type `MigrationRegistry`,
+    /// without the `?`, doesn't implement this requirement: Swift accepts it
+    /// silently, and `App migrate` keeps running `Sources/Migrations/`.
+    ///
     /// Default: `nil`.
     var migrations: MigrationRegistry? { get }
 

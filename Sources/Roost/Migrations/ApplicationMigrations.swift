@@ -22,9 +22,14 @@ extension RoostApp {
                 FileHandle.standardError.write(Data("Error: \(error)\n".utf8))
                 return 64  // EX_USAGE
             }
-            // Spectro's help says that `down` without `--step` rolls back everything.
-            if arguments.contains(where: { $0 == "--help" || $0 == "-h" }) || arguments.first == "help" {
-                print("In \(app), `down` without --step rolls back only the newest migration; `down --all` rolls back every one.\n")
+            // Spectro's help names its own `migrations` command and says that `down`
+            // without `--step` rolls back everything.
+            if Self.asksForHelp(arguments) {
+                print("""
+                    Run these as `\(app) migrate <subcommand>`. In \(app), `down` without --step rolls back \
+                    only the newest migration; `down --all` rolls back every one.
+
+                    """)
             }
             return await MigrationCommand.run(arguments: spectroArguments, migrations: migrations) {
                 guard let config = database else { throw MigrationCommandError("No database configured in \(app).") }
@@ -56,6 +61,12 @@ extension RoostApp {
         return 0
     }
 
+    /// `true` when Spectro will print help: no subcommand, `help`, or a help flag.
+    package static func asksForHelp(_ arguments: [String]) -> Bool {
+        arguments.isEmpty || arguments.first == "help"
+            || arguments.contains { ["--help", "-h", "-help"].contains($0) }
+    }
+
     /// Spectro's `down` rolls back every migration unless `--step` is given.
     /// `roost migrate down` has always meant the newest one, so keep that, and
     /// turn `down --all` into Spectro's bare `down`.
@@ -66,7 +77,7 @@ extension RoostApp {
             guard !hasStep else { throw MigrationCommandError("Pass --step or --all to down, not both.") }
             return arguments.filter { $0 != "--all" }
         }
-        guard !hasStep, !arguments.contains(where: { $0 == "--help" || $0 == "-h" }) else { return arguments }
+        guard !hasStep, !asksForHelp(arguments) else { return arguments }
         return arguments + ["--step", "1"]
     }
 }
