@@ -61,9 +61,9 @@ key and the owner in one SQL statement, so a method doesn't read a record
 before changing it. Another owner's record and a missing one are both a 404.
 `insert(_:)` sets the owner itself, so a request can't choose it.
 
-Contexts generated before Roost 2.2 pass the owner to each method and keep the
-ownership predicate in every query. That style still works; a scoped
-repository removes the need to repeat it.
+Contexts that pass the owner to each method and keep the ownership predicate
+in every query, as roost-cli generates them, still work; a scoped repository
+removes the need to repeat it.
 
 ### Write typed changes
 
@@ -76,7 +76,7 @@ try await repo.update(Bookmark.self, id: id, changes)
 ```
 
 Writes through ``Changes`` set an `updatedAt` timestamp to the current time
-unless the changes set it themselves. Spectro's `update(_:id:changes:)` takes a
+unless the changes set it themselves. Empty changes write nothing. Spectro's `update(_:id:changes:)` takes a
 dictionary keyed by property name instead; a misspelled key fails only when the
 query runs.
 
@@ -104,7 +104,11 @@ let bookmark = try await context.createBookmark(conn.permit(Bookmark.editable))
 ```
 
 Each field decodes as its property's type. Fields the list leaves out, such as
-`userId`, are ignored. The key path rules of ``ValidatorRule`` name each field
+`userId`, are ignored. A JSON body may also name a field the way `@Schema`
+encodes it, such as `read_at` for `readAt`, so a client can send back what it
+read. A JSON body that leaves out an optional field leaves it unchanged, so a
+partial update keeps the stored value; `null` clears it. A form, which sends
+every field it shows, sets a missing optional field to `nil`. The key path rules of ``ValidatorRule`` name each field
 after the schema property, and ``ValidationErrors`` uses that name, which is
 also the form field's name. A rule checks only the fields the changes set,
 except `required`, which treats a missing field as blank. Adding a column then
@@ -167,6 +171,9 @@ var migrations: MigrationRegistry? {
 }
 ```
 
+Keep the `?`: a property of type `MigrationRegistry` doesn't implement the
+requirement, and `App migrate` would keep running `Sources/Migrations/`.
+
 Move the SQL files into the app target, unchanged, and bundle them with
 `resources: [.copy("Migrations/SQL")]` in `Package.swift`. Their IDs stay the
 same, so a database that already applied them doesn't run them again. Then
@@ -195,7 +202,8 @@ With a registry, `App migrate` runs Spectro's migration command, and
 `roost migrate up`, `down`, and `status` keep working. `App migrate plan`
 prints the SQL of every migration without connecting to a database;
 `plan --direction down` prints the rollbacks. `down` rolls back only the
-newest migration unless you pass `--step`. `roost gen migration` still writes
+newest migration unless you pass `--step`, or `--all` to roll back every one.
+`roost gen migration` still writes
 SQL to `Sources/Migrations/`, which a registry doesn't read: write Swift
 migrations by hand for now.
 
@@ -225,6 +233,9 @@ A compiled application also accepts the migration command:
 ROOST_ENV=prod DB_NAME=reading_room .build/release/ReadingRoom migrate up
 ```
 
-Supply the target database credentials in the environment. Run from the
+Supply the target database credentials in the environment. An app with a
+registry reads its SQL from its resource bundle: ship the
+`<Package>_<Target>.resources` directory (`.bundle` on macOS) from
+`.build/release` beside the executable. Without a registry, run from the
 application directory, or ship `Sources/Migrations/` beside the executable.
 See <doc:ConfigurationAndDeployment> and <doc:TestingYourApp>.

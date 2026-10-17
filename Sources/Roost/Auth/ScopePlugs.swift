@@ -31,7 +31,7 @@ public func requireRole(
     return { conn in
         // Must be authenticated
         guard conn.isAuthenticated,
-              let user = conn[CurrentUserKey.self]
+              let user = conn.roost_untypedAssign(CurrentUserKey.self)
         else {
             return haltForbiddenOrRedirect(conn, redirectTo: redirectTo)
         }
@@ -76,7 +76,7 @@ public func requirePermission(
 ) -> Plug {
     return { conn in
         guard conn.isAuthenticated,
-              let user = conn[CurrentUserKey.self]
+              let user = conn.roost_untypedAssign(CurrentUserKey.self)
         else {
             return haltForbiddenOrRedirect(conn, redirectTo: redirectTo)
         }

@@ -631,14 +631,38 @@ private struct InvalidRegistryApp: RoostApp {
 struct MigrationRegistryCommandTests {
 
     @Test("down without --step rolls back only the newest migration")
-    func downDefaultsToOneStep() {
-        #expect(RegistryApp.registryArguments(["down"]) == ["down", "--step", "1"])
-        #expect(RegistryApp.registryArguments(["down", "--database", "app"]) == ["down", "--database", "app", "--step", "1"])
-        #expect(RegistryApp.registryArguments(["down", "--step", "3"]) == ["down", "--step", "3"])
-        #expect(RegistryApp.registryArguments(["down", "--step=0"]) == ["down", "--step=0"])
-        #expect(RegistryApp.registryArguments(["down", "--help"]) == ["down", "--help"])
-        #expect(RegistryApp.registryArguments(["up"]) == ["up"])
-        #expect(RegistryApp.registryArguments(["plan", "--direction", "down"]) == ["plan", "--direction", "down"])
+    func downDefaultsToOneStep() throws {
+        #expect(try RegistryApp.registryArguments(["down"]) == ["down", "--step", "1"])
+        #expect(try RegistryApp.registryArguments(["down", "--database", "app"]) == ["down", "--database", "app", "--step", "1"])
+        #expect(try RegistryApp.registryArguments(["down", "--step", "3"]) == ["down", "--step", "3"])
+        #expect(try RegistryApp.registryArguments(["down", "--step=0"]) == ["down", "--step=0"])
+        #expect(try RegistryApp.registryArguments(["down", "--help"]) == ["down", "--help"])
+        #expect(try RegistryApp.registryArguments(["up"]) == ["up"])
+        #expect(try RegistryApp.registryArguments(["plan", "--direction", "down"]) == ["plan", "--direction", "down"])
+    }
+
+    @Test("down --all rolls back every migration, and can't be combined with --step")
+    func downAllRollsBackEverything() throws {
+        #expect(try RegistryApp.registryArguments(["down", "--all"]) == ["down"])
+        #expect(try RegistryApp.registryArguments(["down", "--all", "--database", "app"]) == ["down", "--database", "app"])
+        #expect(throws: (any Error).self) { try RegistryApp.registryArguments(["down", "--all", "--step", "2"]) }
+        #expect(throws: (any Error).self) { try RegistryApp.registryArguments(["down", "--step=2", "--all"]) }
+    }
+
+    @Test("Roost's note comes with every form of help Spectro prints")
+    func helpRequests() throws {
+        for arguments in [[], ["help"], ["--help"], ["down", "-h"], ["down", "-help"], ["status", "--help"]] {
+            #expect(RegistryApp.asksForHelp(arguments), "\(arguments)")
+        }
+        for arguments in [["up"], ["down"], ["down", "--step", "2"], ["plan", "--direction", "down"]] {
+            #expect(!RegistryApp.asksForHelp(arguments), "\(arguments)")
+        }
+        #expect(try RegistryApp.registryArguments(["down", "-help"]) == ["down", "-help"])
+    }
+
+    @Test("down --all --step is a usage error, before any database connection")
+    func downAllWithStepIsAUsageError() async throws {
+        #expect(try await RegistryApp().runMigrationCommand(["down", "--all", "--step", "2"]) == 64)
     }
 
     @Test("plan compiles the registry without a database")

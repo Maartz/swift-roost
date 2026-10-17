@@ -142,7 +142,7 @@ extension Connection {
 
     /// `true` when a user has been stored in assigns (i.e. authenticated).
     public var isAuthenticated: Bool {
-        authenticatedUserID != nil
+        roost_untypedAssign(CurrentUserIDKey.self) != nil
     }
 
     /// Identity established by authentication middleware for this request.

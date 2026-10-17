@@ -41,7 +41,7 @@ let package = Package(
         // `RichTerminal` trait passes Spectro's on; without it spectro prints plain text
         // and Noora is not fetched. `Migrations` gives `App migrate` Spectro's migration
         // command; it shares ArgumentParser with `CLI`.
-        ecosystem("Spectro", from: "2.3.0", traits: [
+        ecosystem("Spectro", from: "2.3.1", traits: [
             "CLI", "Migrations",
             .trait(name: "RichTerminal", condition: .when(traits: ["RichTerminal"])),
         ]),
@@ -84,6 +84,7 @@ let package = Package(
             dependencies: [
                 .product(name: "SpectroKit", package: "Spectro"),
                 .product(name: "SpectroMigrations", package: "Spectro"),
+                .product(name: "SpectroCommon", package: "Spectro"),
                 .product(name: "Nexus", package: "Nexus"),
                 .product(name: "NexusRouter", package: "Nexus"),
                 .product(name: "NexusHummingbird", package: "Nexus"),

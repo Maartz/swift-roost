@@ -71,6 +71,50 @@ jobs:
       - name: Test the key-value store against Valkey
         run: swift test --traits Valkey
 
+  # Runs ScopedRepo's SQL and the example's migrations against a real database.
+  example-app:
+    if: ${{ !inputs.published_framework }}
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: roost_example
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ROOST_FRAMEWORK_PATH: ${{ github.workspace }}
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: roost_example
+    defaults:
+      run:
+        working-directory: examples/Roost
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import Swift signing keys
+        run: curl --fail --silent --show-error --location --compressed --retry 3 https://www.swift.org/keys/all-keys.asc | gpg --batch --import
+      - uses: swift-actions/setup-swift@364295d9c23900ce04d4e5cc708387921b4e50f9 # v3, Swiftly-backed installer
+        with:
+          swift-version: "6.3.3"
+      - name: Install Linux system dependencies
+        run: sudo apt-get update && sudo apt-get install -y zlib1g-dev
+      - name: Build the example against this checkout
+        run: swift build --product RoostExample
+      - name: Apply the example's migrations
+        run: '"$(swift build --show-bin-path)/RoostExample" migrate up'
+      - name: Test the example
+        run: swift test
+
   generated-app:
     runs-on: ubuntu-24.04
     services:

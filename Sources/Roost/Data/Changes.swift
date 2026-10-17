@@ -117,11 +117,16 @@ public struct Changes<Model: Schema>: Sendable {
 
     /// The changes as Spectro's property-name dictionary.
     ///
-    /// - Parameter touching: Spectro metadata for `Model`. When it lists an
-    ///   `updatedAt` timestamp that these changes don't set, the result sets
-    ///   it to the current time.
+    /// - Parameters:
+    ///   - metadata: Spectro metadata for `Model`. When it lists an `updatedAt`
+    ///     timestamp that these changes don't set, and there is something to
+    ///     write, the result sets it to the current time.
+    ///   - excluded: A field to leave out, such as a scoped repository's owner.
     /// - Throws: `SpectroError.invalidSchema` when a field isn't a column.
-    func columnValues(touching metadata: SchemaMetadata? = nil) throws -> [(field: String, value: any Sendable)] {
+    func columnValues(
+        touching metadata: SchemaMetadata? = nil,
+        excluding excluded: String? = nil
+    ) throws -> [(field: String, value: any Sendable)] {
         guard unmapped.isEmpty else {
             throw SpectroError.invalidSchema(
                 reason: "\(Model.self) has no column for \(unmapped.sorted().joined(separator: ", ")). "
@@ -129,9 +134,10 @@ public struct Changes<Model: Schema>: Sendable {
             )
         }
         var values: [(field: String, value: any Sendable)] = fields.compactMap { name in
-            changes[name].map { (name, $0.value) }
+            guard name != excluded else { return nil }
+            return changes[name].map { (name, $0.value) }
         }
-        if let metadata, changes["updatedAt"] == nil,
+        if let metadata, !values.isEmpty, changes["updatedAt"] == nil,
            metadata.fields.contains(where: { $0.name == "updatedAt" && $0.isTimestamp }) {
             values.append(("updatedAt", Date()))
         }

@@ -47,6 +47,13 @@ typealias AuthContextKey = _roost_auth_context
 typealias CurrentScopeKey = _roost_current_scope
 
 extension Connection {
+    /// The value in `key`'s slot, whatever its type. 2.1 checked these slots
+    /// for any value, so an app that stores a `UUID` under
+    /// `AuthAssign.currentUserID` is still authenticated.
+    func roost_untypedAssign(_ key: any AssignKey.Type) -> (any Sendable)? {
+        assigns[String(describing: key)]
+    }
+
     /// Stores `user` as the authenticated user.
     func roost_authenticate(_ user: some Authenticatable, context: AuthContext?) -> Connection {
         let conn = assign(CurrentUserKey.self, value: user)

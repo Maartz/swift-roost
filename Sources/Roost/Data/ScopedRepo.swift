@@ -2,6 +2,7 @@ import Foundation
 import Nexus
 import PostgresNIO
 import Spectro
+import SpectroCommon
 
 /// The records of `Model` that belong to one owner, such as the signed-in user.
 ///
@@ -95,7 +96,7 @@ public struct ScopedRepo<Model: Schema, Owner: PrimaryKeyType>: Sendable {
     public func update(_ id: some PrimaryKeyType, _ changes: Changes<Model>) async throws -> Model {
         let metadata = await SchemaRegistry.shared.register(Model.self)
         let ownerName = Changes<Model>.name(of: ownerField)
-        let values = try changes.columnValues(touching: metadata).filter { $0.field != ownerName }
+        let values = try changes.columnValues(touching: metadata, excluding: ownerName)
         guard !values.isEmpty else { return try await get(id) }
         let statement = try Self.updateStatement(
             metadata, id: id.toPostgresData(), ownerField: ownerName, owner: owner.toPostgresData(), values: values)
@@ -163,7 +164,7 @@ extension ScopedRepo {
         }
         let match = try matching(metadata, ownerField: ownerField, firstParameter: parameters.count + 1)
         return Statement(
-            sql: "UPDATE \(quoted(metadata.tableName)) SET \(assignments.joined(separator: ", ")) "
+            sql: "UPDATE \(metadata.tableName.quoted) SET \(assignments.joined(separator: ", ")) "
                 + "WHERE \(match) RETURNING *",
             parameters: parameters + [id, owner])
     }
@@ -175,10 +176,10 @@ extension ScopedRepo {
         owner: PostgresData
     ) throws -> Statement {
         let match = try matching(metadata, ownerField: ownerField, firstParameter: 1)
-        let table = quoted(metadata.tableName)
+        let table = metadata.tableName.quoted
         let primaryKey = try primaryKeyColumn(in: metadata)
         let sql = if let softDelete = metadata.softDeleteField {
-            "UPDATE \(table) SET \(quoted(softDelete)) = NOW() WHERE \(match) RETURNING \(primaryKey)"
+            "UPDATE \(table) SET \(softDelete.quoted) = NOW() WHERE \(match) RETURNING \(primaryKey)"
         } else {
             "DELETE FROM \(table) WHERE \(match) RETURNING \(primaryKey)"
         }
@@ -191,7 +192,7 @@ extension ScopedRepo {
         var sql = "\(try primaryKeyColumn(in: metadata)) = $\(firstParameter) "
             + "AND \(try column(ownerField, in: metadata)) = $\(firstParameter + 1)"
         if let softDelete = metadata.softDeleteField {
-            sql += " AND \(quoted(softDelete)) IS NULL"
+            sql += " AND \(softDelete.quoted) IS NULL"
         }
         return sql
     }
@@ -200,17 +201,13 @@ extension ScopedRepo {
         guard let field = metadata.fields.first(where: \.isPrimaryKey) else {
             throw SpectroError.invalidSchema(reason: "Schema \(Model.self) has no primary key field")
         }
-        return quoted(field.databaseName)
+        return field.databaseName.quoted
     }
 
     private static func column(_ field: String, in metadata: SchemaMetadata) throws -> String {
         guard let info = metadata.fields.first(where: { $0.name == field }) else {
             throw SpectroError.invalidSchema(reason: "Unknown column '\(field)' on \(Model.self)")
         }
-        return quoted(info.databaseName)
-    }
-
-    private static func quoted(_ identifier: String) -> String {
-        "\"\(identifier.replacingOccurrences(of: "\"", with: "\"\""))\""
+        return info.databaseName.quoted
     }
 }
