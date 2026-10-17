@@ -145,19 +145,17 @@ struct ErrorRescueTests {
     @Test func validationErrorsRespond422WithTheFieldErrorsToJSON() async throws {
         let errors = titleErrors
         let plug = roost_rescueErrors { _ in throw errors }
-        let expected = try makeConn().json(status: .unprocessableContent, value: errors)
 
         for accept in ["application/json", "application/json, text/html;q=0.5"] {
             let result = try await plug(makeConn(accept: accept))
             #expect(result.response.status == .unprocessableContent)
             #expect(result.isHalted)
             #expect(result.response.headerFields[.contentType] == "application/json")
-            guard case .buffered(let data) = result.responseBody,
-                  case .buffered(let body) = expected.responseBody else {
-                Issue.record("Expected buffered response bodies")
+            // Not a byte comparison: JSONEncoder doesn't keep the field order stable.
+            guard case .buffered(let data) = result.responseBody else {
+                Issue.record("Expected a buffered response body")
                 continue
             }
-            #expect(data == body)
             #expect(try JSONDecoder().decode(ValidationErrors.self, from: data) == errors)
         }
     }
