@@ -15,8 +15,10 @@ import Spectro
 /// ```
 ///
 /// A rule checks a field only when the changes set it, so a rule for `title`
-/// doesn't fail an update that only changes `read`. The `required` rules are
-/// the exception: they treat a field the changes don't set as blank.
+/// doesn't fail an update that only changes `read`, and skips an optional
+/// field set to `nil`, except `custom`, whose closure receives the optional.
+/// The `required` rules are the exception: they treat a field the changes
+/// don't set as blank.
 extension ValidatorRule {
 
     /// Validates that a string field is set and not blank.
@@ -90,6 +92,18 @@ extension ValidatorRule {
         checking(field, with: .url(Changes<Model>.name(of: field)) { $0 })
     }
 
+    /// Validates the email format of an optional string when it isn't `nil`.
+    public static func email<Model>(_ field: KeyPath<Model, String?> & Sendable) -> ValidatorRule
+    where T == Changes<Model> {
+        checking(field, with: .email(Changes<Model>.name(of: field)) { $0 })
+    }
+
+    /// Validates the URL format of an optional string when it isn't `nil`.
+    public static func url<Model>(_ field: KeyPath<Model, String?> & Sendable) -> ValidatorRule
+    where T == Changes<Model> {
+        checking(field, with: .url(Changes<Model>.name(of: field)) { $0 })
+    }
+
     /// Validates that a value is in an allowed set.
     public static func inclusion<Model, Value: Equatable & Sendable>(
         _ field: KeyPath<Model, Value> & Sendable,
@@ -99,9 +113,27 @@ extension ValidatorRule {
         checking(field, with: .inclusion(Changes<Model>.name(of: field), { $0 }, in: allowed, message: message))
     }
 
+    /// Validates that an optional value is in an allowed set when it isn't `nil`.
+    public static func inclusion<Model, Value: Equatable & Sendable>(
+        _ field: KeyPath<Model, Value?> & Sendable,
+        in allowed: [Value],
+        message: String? = nil
+    ) -> ValidatorRule where T == Changes<Model> {
+        checking(field, with: .inclusion(Changes<Model>.name(of: field), { $0 }, in: allowed, message: message))
+    }
+
     /// Validates that a value is not in a disallowed set.
     public static func exclusion<Model, Value: Equatable & Sendable>(
         _ field: KeyPath<Model, Value> & Sendable,
+        from disallowed: [Value],
+        message: String? = nil
+    ) -> ValidatorRule where T == Changes<Model> {
+        checking(field, with: .exclusion(Changes<Model>.name(of: field), { $0 }, from: disallowed, message: message))
+    }
+
+    /// Validates that an optional value is not in a disallowed set when it isn't `nil`.
+    public static func exclusion<Model, Value: Equatable & Sendable>(
+        _ field: KeyPath<Model, Value?> & Sendable,
         from disallowed: [Value],
         message: String? = nil
     ) -> ValidatorRule where T == Changes<Model> {
@@ -122,8 +154,23 @@ extension ValidatorRule {
             lessThan: lessThan, lessThanOrEqual: lessThanOrEqual))
     }
 
+    /// Validates an optional numeric value against range constraints when it isn't `nil`.
+    public static func number<Model, Number: Comparable & Sendable>(
+        _ field: KeyPath<Model, Number?> & Sendable,
+        greaterThan: Number? = nil,
+        greaterThanOrEqual: Number? = nil,
+        lessThan: Number? = nil,
+        lessThanOrEqual: Number? = nil
+    ) -> ValidatorRule where T == Changes<Model> {
+        checking(field, with: .number(
+            Changes<Model>.name(of: field), { $0 },
+            greaterThan: greaterThan, greaterThanOrEqual: greaterThanOrEqual,
+            lessThan: lessThan, lessThanOrEqual: lessThanOrEqual))
+    }
+
     /// Validates one field with a closure that returns an error message, or
-    /// `nil` when the value is valid.
+    /// `nil` when the value is valid. For an optional field, the closure
+    /// receives the optional, `nil` included.
     ///
     /// ```swift
     /// .custom(\.url) { url in url.hasPrefix("https://") ? nil : "must start with https://" }

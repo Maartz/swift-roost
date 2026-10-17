@@ -20,10 +20,16 @@ import Spectro
 /// ```
 ///
 /// A request can't set a field the list leaves out, such as `userId`. The
-/// parameter names are the property names. Each field decodes as its
+/// parameter names are the property names; a JSON body may also use the
+/// snake_case names `@Schema` writes, such as `read_at` for `readAt`, so a
+/// client can send back a record it read. Each field decodes as its
 /// property's type, the way ``Nexus/Connection/permit(_:decoder:)-(T.Type,_)`` decodes a
-/// struct with the same properties: a missing optional field is `nil`, an
-/// unchecked checkbox is `false`, and any other missing field is an error.
+/// struct with the same properties: an unchecked checkbox is `false`, and a
+/// missing field that isn't optional is an error.
+///
+/// A missing optional field is `nil` in a form, which sends every field it
+/// shows. In a JSON body it's left out of the changes, so a partial update
+/// keeps the stored value; send `null` to clear it.
 public struct Permitted<Model: Schema>: Sendable {
     fileprivate struct Field: Sendable {
         let name: String
@@ -83,12 +89,17 @@ extension Permitted.Field {
             changes.set(keyPath, to: try values.decode(name, as: Value.self))
         }
         json = { container, changes in
-            let key = FieldKey(name)
-            // Synthesized `Decodable` treats a missing optional as `nil`.
-            if !container.contains(key), let none = (Value.self as? any OptionalValue.Type)?.nilValue as? Value {
-                changes.set(keyPath, to: none)
-            } else {
+            guard let key = FieldKey.matching(name, in: container) else {
+                // A missing optional keeps the stored value; a missing required field throws.
+                if Value.self is any OptionalValue.Type { return }
+                changes.set(keyPath, to: try container.decode(Value.self, forKey: FieldKey(name)))
+                return
+            }
+            do {
                 changes.set(keyPath, to: try container.decode(Value.self, forKey: key))
+            } catch let error as DecodingError {
+                // Errors name the property, whichever spelling the body used.
+                throw error.renamingField(key.stringValue, to: name)
             }
         }
     }
@@ -173,12 +184,61 @@ private struct FieldKey: CodingKey {
     init(_ name: String) { stringValue = name }
     init?(stringValue: String) { self.stringValue = stringValue }
     init?(intValue: Int) { nil }
+
+    /// The key a JSON body uses for the property `name`: the name itself, or
+    /// the snake_case form `@Schema` encodes (`user_i_d` for `userID`) or the
+    /// usual one (`user_id`).
+    static func matching(_ name: String, in container: KeyedDecodingContainer<FieldKey>) -> FieldKey? {
+        for candidate in [name, schemaSnakeCase(name), acronymSnakeCase(name)] {
+            let key = FieldKey(candidate)
+            if container.contains(key) { return key }
+        }
+        return nil
+    }
+
+    /// `@Schema`'s rule: an underscore before every uppercase letter.
+    private static func schemaSnakeCase(_ name: String) -> String {
+        var result = ""
+        for (index, character) in name.enumerated() {
+            if character.isUppercase && index > 0 { result += "_" }
+            result += character.lowercased()
+        }
+        return result
+    }
+
+    /// An underscore where a lowercase letter or digit meets an uppercase one.
+    private static func acronymSnakeCase(_ name: String) -> String {
+        var result = ""
+        var previous: Character?
+        for character in name {
+            if character.isUppercase, let previous, previous.isLowercase || previous.isNumber { result += "_" }
+            result += character.lowercased()
+            previous = character
+        }
+        return result
+    }
 }
 
-private protocol OptionalValue {
-    static var nilValue: Self { get }
+extension DecodingError {
+    /// This error with the top-level field `alias` in its path named `name` instead.
+    fileprivate func renamingField(_ alias: String, to name: String) -> DecodingError {
+        guard alias != name else { return self }
+        func renamed(_ context: Context) -> Context {
+            var path = context.codingPath
+            if path.first?.stringValue == alias { path[0] = FieldKey(name) }
+            return Context(codingPath: path, debugDescription: context.debugDescription,
+                           underlyingError: context.underlyingError)
+        }
+        switch self {
+        case .typeMismatch(let type, let context): return .typeMismatch(type, renamed(context))
+        case .valueNotFound(let type, let context): return .valueNotFound(type, renamed(context))
+        case .keyNotFound(let key, let context): return .keyNotFound(key, renamed(context))
+        case .dataCorrupted(let context): return .dataCorrupted(renamed(context))
+        @unknown default: return self
+        }
+    }
 }
 
-extension Optional: OptionalValue {
-    fileprivate static var nilValue: Self { nil }
-}
+private protocol OptionalValue {}
+
+extension Optional: OptionalValue {}

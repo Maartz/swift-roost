@@ -35,7 +35,7 @@ final class RecordingRepo: Repo, @unchecked Sendable {
         return T()
     }
 
-    func getOrFail<T: Schema>(_ schema: T.Type, id: some PrimaryKeyType) async throws -> T { fatalError("unused") }
+    func getOrFail<T: Schema>(_ schema: T.Type, id: some PrimaryKeyType) async throws -> T { stored as? T ?? T() }
     func all<T: Schema>(_ schema: T.Type) async throws -> [T] { fatalError("unused") }
     func upsert<T: Schema>(_ instance: T, conflictTarget: ConflictTarget, set: [String]?, includePrimaryKey: Bool) async throws -> T { fatalError("unused") }
     func insertAll<T: Schema>(_ instances: [T], includePrimaryKey: Bool) async throws -> [T] { fatalError("unused") }

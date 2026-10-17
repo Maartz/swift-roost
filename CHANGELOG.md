@@ -55,11 +55,13 @@ input type, its normalization, an insert, and an update dictionary.
 - `Changes<Model>` holds the values to write to a model, each named by a key
   path, so the compiler checks the property and the value's type.
   `repo.update(_:id:_:)` writes them. Writes through `Changes` set an
-  `updatedAt` timestamp unless the changes set it.
+  `updatedAt` timestamp unless the changes set it; empty changes write nothing.
 - `Permitted<Model>(\.title, \.url)` lists the fields a request may set.
   `conn.permit(_:)` decodes them from forms and JSON into `Changes` and reports
   every invalid field, not just the first. `FormValues.decode(_:)` does the
-  same outside a request.
+  same outside a request. A JSON body may use the snake_case names `@Schema`
+  encodes, such as `read_at`, and an optional field it leaves out stays
+  unchanged, so a partial update doesn't clear it.
 - `ValidatorRule` has key path rules for `Changes`, such as `.required(\.title)`
   and `.length(\.note, max: 2000)`. They name each field after the schema
   property instead of a repeated string.
@@ -74,7 +76,8 @@ input type, its normalization, an insert, and an update dictionary.
   `conn.authContext` reports whether the user signed in with a session or a
   bearer token.
 - Roost stores authentication and the scope under typed assign keys. The
-  `AuthAssign` string keys still reach the same values.
+  `AuthAssign` string keys still reach the same values, and as in 2.1, any
+  value under `AuthAssign.currentUserID` authenticates the request.
 - The example app uses all of the above. `BookmarksContext` holds a
   `ScopedRepo`, `ReaderScope` carries the reader's `UUID`, and
   `Bookmark.editable` lists the editable fields once.
@@ -105,9 +108,20 @@ Most apps compile unchanged, with deprecation warnings for:
   instead: stop the process, do nothing, or go unused. Roost 3.0 removes them
   from the stable API until they are implemented.
 
-Code that reads `scopeId` from an `any AuthScope` value now gets
-`(any Hashable & Sendable)?` instead of `String?`. Read it from the concrete
-scope type instead.
+`AuthScope` has an associated type, which changes code that works with any
+scope rather than a concrete one:
+
+- Reading `scopeId` from an `any AuthScope` value gets
+  `(any Hashable & Sendable)?` instead of `String?`. Read it from the concrete
+  scope type instead.
+- Generic code gets `S.ScopeID?`, so `func id<S: AuthScope>(_ scope: S) -> String? { scope.scopeId }`
+  no longer compiles. Add `where S.ScopeID == String`, or return `S.ScopeID?`.
+- `AuthScope` used as a type is an existential, which Swift 6's `ExistentialAny`
+  setting reports. Write `any AuthScope`.
+
+Roost now requires Spectro 2.3.1 or later. Spectro 2.3.0 joined `where`
+clauses without parentheses, so an `||` condition on `ScopedRepo.query()`
+could return another owner's records. `swift package update` picks it up.
 
 `import Roost` now includes SpectroMigrations, whose public names include
 `Migration`, `SQL`, `CreateTable`, `AlterTable`, `DropTable`, `CreateIndex`,

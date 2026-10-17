@@ -61,9 +61,9 @@ key and the owner in one SQL statement, so a method doesn't read a record
 before changing it. Another owner's record and a missing one are both a 404.
 `insert(_:)` sets the owner itself, so a request can't choose it.
 
-Contexts generated before Roost 2.2 pass the owner to each method and keep the
-ownership predicate in every query. That style still works; a scoped
-repository removes the need to repeat it.
+Contexts that pass the owner to each method and keep the ownership predicate
+in every query, as roost-cli generates them, still work; a scoped repository
+removes the need to repeat it.
 
 ### Write typed changes
 
@@ -76,7 +76,7 @@ try await repo.update(Bookmark.self, id: id, changes)
 ```
 
 Writes through ``Changes`` set an `updatedAt` timestamp to the current time
-unless the changes set it themselves. Spectro's `update(_:id:changes:)` takes a
+unless the changes set it themselves. Empty changes write nothing. Spectro's `update(_:id:changes:)` takes a
 dictionary keyed by property name instead; a misspelled key fails only when the
 query runs.
 
@@ -104,7 +104,11 @@ let bookmark = try await context.createBookmark(conn.permit(Bookmark.editable))
 ```
 
 Each field decodes as its property's type. Fields the list leaves out, such as
-`userId`, are ignored. The key path rules of ``ValidatorRule`` name each field
+`userId`, are ignored. A JSON body may also name a field the way `@Schema`
+encodes it, such as `read_at` for `readAt`, so a client can send back what it
+read. A JSON body that leaves out an optional field leaves it unchanged, so a
+partial update keeps the stored value; `null` clears it. A form, which sends
+every field it shows, sets a missing optional field to `nil`. The key path rules of ``ValidatorRule`` name each field
 after the schema property, and ``ValidationErrors`` uses that name, which is
 also the form field's name. A rule checks only the fields the changes set,
 except `required`, which treats a missing field as blank. Adding a column then
