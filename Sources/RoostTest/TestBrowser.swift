@@ -38,7 +38,7 @@ public actor TestBrowser<App: RoostApp> {
     }
 
     /// Signs the browser in as `user` with a session token, storing the user's
-    /// ``Authenticatable/authID`` too, as `conn.loginUser(user, token:)` does.
+    /// `Authenticatable.authID` too, as `conn.loginUser(user, token:)` does.
     public func signIn(_ user: some Authenticatable, token: String) {
         pendingSession.merge(TestSession.signedIn(user, token: token)) { $1 }
     }
@@ -88,7 +88,7 @@ public enum TestSession {
     }
 
     /// A session signed in as `user` with `token`, with the user's
-    /// ``Authenticatable/authID`` too, as `conn.loginUser(user, token:)` leaves it.
+    /// `Authenticatable.authID` too, as `conn.loginUser(user, token:)` leaves it.
     public static func signedIn(_ user: some Authenticatable, token: String) -> [String: String] {
         [sessionTokenKey: token, sessionUserIDKey: user.authID]
     }

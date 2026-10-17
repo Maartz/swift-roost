@@ -70,6 +70,7 @@ let package = Package(
             name: "Roost",
             dependencies: [
                 .product(name: "SpectroKit", package: "Spectro"),
+                .product(name: "SpectroCommon", package: "Spectro"),
                 .product(name: "Nexus", package: "Nexus"),
                 .product(name: "NexusRouter", package: "Nexus"),
                 .product(name: "NexusHummingbird", package: "Nexus"),

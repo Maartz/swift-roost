@@ -216,6 +216,17 @@ struct RequireRoleTests {
         #expect(result.response.status == .forbidden)
     }
 
+    @Test("As in 2.1, any value under the string keys authenticates, and any role provider passes")
+    func stringKeys() async throws {
+        struct Moderator: UserRoleProvider { var role: String { "moderator" } }
+        let conn = TestConnection.build()
+            .assign(key: "_roost_current_user_id", value: UUID())
+            .assign(key: "_roost_current_user", value: Moderator())
+        #expect(conn.isAuthenticated)
+        #expect(conn.authenticatedUserID == nil)
+        #expect(try await !requireRole("moderator")(conn).isHalted)
+    }
+
     @Test("requireRole returns 403 when no user is authenticated")
     func noUser() async throws {
         let plug = requireRole("admin")
