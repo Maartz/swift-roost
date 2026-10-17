@@ -42,8 +42,10 @@ keep sessions across restarts and servers, enable the `Valkey` trait, set
 
 Rate limits change in two ways:
 
-- Limits created at the same place in the code share counters, such as two
-  limits made by one helper function. Pass `name:` to keep them apart.
+- Limits created at the same place in the code with the same `max` and
+  window share counters, such as two limits made by one helper function for
+  different routes. Before, each plug counted on its own. Pass `name:` to keep
+  them apart.
 - An app that receives requests directly, without a proxy, is now limited
   by each client's socket address.
 

@@ -52,8 +52,10 @@ public enum RateLimitKey: Sendable {
 ///   - by: How to identify the client. Defaults to IP address.
 ///   - message: Custom error message for 429 responses.
 ///   - name: Keeps this limit's counters apart from other limits'. Defaults to
-///     the place in the code that creates the plug, so limits created there
-///     share counters on every instance of the app.
+///     the place in the code that creates the plug, with `max` and
+///     `windowSeconds`, so that limit shares counters on every instance of the
+///     app. A helper that creates the same limit for several routes shares one
+///     counter between them; pass a name to count each route separately.
 ///   - fileID: The file that creates the plug, which names it when `name` is `nil`.
 ///   - line: The line that creates the plug, which names it when `name` is `nil`.
 /// - Returns: A plug that enforces rate limits and sets `X-RateLimit-*` headers.
@@ -68,7 +70,8 @@ public func rateLimit(
 ) -> Plug {
     roost_rateLimit(
         max: max, windowSeconds: windowSeconds, by: by, message: message,
-        name: name ?? "\(fileID):\(line)"
+        // A helper that takes `max` makes different limits on one line.
+        name: name ?? "\(fileID):\(line):\(max)/\(windowSeconds)s"
     )
 }
 

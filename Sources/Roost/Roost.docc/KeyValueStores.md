@@ -133,7 +133,8 @@ var plugs: [Plug] {
 
 The window slides, so a client can't send twice the limit around the moment
 one window ends and the next begins. Limits created at the same place in the
-code share counters; pass `name:` to keep two of them apart. If the store
+code, with the same `max` and window, share counters, even when a helper
+creates them for different routes; pass `name:` to keep them apart. If the store
 fails, requests are allowed and the error is logged, so a Valkey outage
 doesn't take the app down.
 

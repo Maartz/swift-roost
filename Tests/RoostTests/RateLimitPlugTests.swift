@@ -423,6 +423,18 @@ struct RateLimitStoreTests {
         #expect(try await login(client("a", store: store)).isHalted)
     }
 
+    @Test("Unnamed limits made by one helper share counters only when their max and window match")
+    func helperLimits() async throws {
+        func limited(max: Int) -> Plug {
+            rateLimit(max: max, windowSeconds: 60, by: .header(HTTPField.Name("X-Client")!))
+        }
+        let store = MemoryKeyValueStore()
+        let login = limited(max: 1), reset = limited(max: 1), api = limited(max: 5)
+        #expect(try await !login(client("a", store: store)).isHalted)
+        #expect(try await reset(client("a", store: store)).isHalted)
+        #expect(try await !api(client("a", store: store)).isHalted)
+    }
+
     @Test("In an app, limits count in conn.store, which each test app has to itself")
     func throughTestApp() async throws {
         let app = try await TestApp(LimitedApp.self)
