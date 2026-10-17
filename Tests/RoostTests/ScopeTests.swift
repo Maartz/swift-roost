@@ -129,6 +129,52 @@ struct ConnectionScopeTests {
         let conn = TestConnection.build().setScope(TestScope(userId: nil))
         #expect(!conn.hasScope)
     }
+
+    @Test("A scope's ID has the type of the entity's primary key")
+    func typedScopeID() {
+        struct ReaderScope: AuthScope {
+            let userID: UUID
+            var scopeId: UUID? { userID }
+        }
+        let id = UUID()
+        let scope = TestConnection.build().setScope(ReaderScope(userID: id)).currentScope(ReaderScope.self)
+        let scopeID: UUID? = scope?.scopeId
+        #expect(scopeID == id)
+    }
+
+    @Test("requireScope returns the scope that was set")
+    func requireScopeReturnsScope() throws {
+        let conn = TestConnection.build().setScope(TestScope(userId: "abc"))
+        #expect(try conn.requireScope(TestScope.self) == TestScope(userId: "abc"))
+    }
+
+    @Test("requireScope is a 401 when no scope, an empty scope, or another type is set", arguments: [
+        TestConnection.build(),
+        TestConnection.build().setScope(TestScope(userId: nil)),
+        TestConnection.build().setScope(UUIDScope(id: UUID())),
+    ])
+    func requireScopeUnauthorized(conn: Connection) {
+        #expect {
+            try conn.requireScope(TestScope.self)
+        } throws: { error in
+            (error as? NexusHTTPError)?.status == .unauthorized
+        }
+    }
+
+    @Test("logoutUser clears the scope")
+    func logoutClearsScope() {
+        let conn = TestConnection.build()
+            .setCurrentUser(RoleUser())
+            .setScope(TestScope(userId: "user-1"))
+            .logoutUser()
+        #expect(conn.currentScope(TestScope.self) == nil)
+        #expect(!conn.isAuthenticated)
+    }
+}
+
+private struct UUIDScope: AuthScope {
+    let id: UUID
+    var scopeId: UUID? { id }
 }
 
 // MARK: - requireRole Plug Tests
@@ -168,6 +214,17 @@ struct RequireRoleTests {
 
         #expect(result.isHalted)
         #expect(result.response.status == .forbidden)
+    }
+
+    @Test("As in 2.1, any value under the string keys authenticates, and any role provider passes")
+    func stringKeys() async throws {
+        struct Moderator: UserRoleProvider { var role: String { "moderator" } }
+        let conn = TestConnection.build()
+            .assign(key: "_roost_current_user_id", value: UUID())
+            .assign(key: "_roost_current_user", value: Moderator())
+        #expect(conn.isAuthenticated)
+        #expect(conn.authenticatedUserID == nil)
+        #expect(try await !requireRole("moderator")(conn).isHalted)
     }
 
     @Test("requireRole returns 403 when no user is authenticated")
@@ -341,7 +398,7 @@ struct ScopeMetadataTests {
         let meta = ScopeMetadata(name: "session", schemaKey: "session_id")
 
         #expect(!meta.isDefault)
-        #expect(meta.assignKey == AuthAssign.currentScope)
+        #expect(meta.assignKey == "_roost_current_scope")
         #expect(meta.schemaType == "UUID")
         #expect(meta.schemaTable == nil)
         #expect(meta.routePrefix == nil)

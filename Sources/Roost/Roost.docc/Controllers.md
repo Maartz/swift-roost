@@ -117,7 +117,7 @@ the action.
 ### Permit parameters
 
 Decode the request's parameters into a `Decodable` type with
-``Nexus/Connection/permit(_:decoder:)``. The type is the list of permitted
+``Nexus/Connection/permit(_:decoder:)-(T.Type,_)``. The type is the list of permitted
 fields, like Rails' strong parameters or Ecto's `cast`:
 
 ```swift
@@ -157,6 +157,33 @@ a ``Changeset``.
 
 To decode form values outside a request, for example in a test, use
 ``FormValues/decode(as:)``.
+
+### Permit a model's fields
+
+When the parameters set a model's columns, list them by key path in a
+``Permitted`` value instead of declaring a struct.
+``Nexus/Connection/permit(_:decoder:)-(Permitted<Model>,_)`` decodes them into
+``Changes`` for the model:
+
+```swift
+extension Recipe {
+    static let editable = Permitted<Recipe>(\.title, \.servings, \.vegetarian, \.notes)
+}
+
+static func create(_ conn: Connection) async throws -> Connection {
+    do {
+        let recipe = try await RecipesContext(repo: conn.repo()).createRecipe(conn.permit(Recipe.editable))
+        return conn.redirect(to: "/recipes/\(recipe.id)")
+    } catch let errors as ValidationErrors {
+        return try conn.render(RecipeNewView(values: conn.bodyParams, errors: errors),
+                               title: "New recipe", status: .unprocessableContent)
+    }
+}
+```
+
+Decoding follows the rules above for a struct with the same properties, but
+reports every missing or invalid field instead of stopping at the first. See
+<doc:DataAndMigrations> to validate the changes and write them.
 
 ### Split routers across files
 
@@ -247,8 +274,11 @@ Logs, spans, and ``metrics()`` read the endpoint from
 
 ### Parameters
 
-- ``Nexus/Connection/permit(_:decoder:)``
+- ``Nexus/Connection/permit(_:decoder:)-(T.Type,_)``
+- ``Nexus/Connection/permit(_:decoder:)-(Permitted<Model>,_)``
+- ``Permitted``
 - ``FormValues/decode(as:)``
+- ``FormValues/decode(_:)``
 
 ### Observability
 

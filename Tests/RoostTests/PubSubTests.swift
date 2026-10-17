@@ -9,12 +9,7 @@ import Testing
 // MARK: - Fixture App
 
 private struct ChatApp: RoostApp {
-    var pubSub: (any RoostPubSub)? {
-        if Roost.env == .test || Roost.env == .dev {
-            return PubSub.inMemory()
-        }
-        return PubSub.valkey(url: ProcessInfo.processInfo.environment["VALKEY_URL"] ?? "valkey://localhost:6379")
-    }
+    var pubSub: (any RoostPubSub)? { PubSub.inMemory() }
 
     @RouteBuilder var routes: [Route] {
         POST("/rooms/:id/messages") { conn in

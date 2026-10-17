@@ -67,9 +67,7 @@ extension Connection {
         let conn = self
             .putSessionValue(sessionTokenKey, token)
             .putSessionValue(sessionUserIDKey, user.authID)
-            .assign(key: AuthAssign.currentUser, value: user)
-            .assign(key: AuthAssign.currentUserID, value: user.authID)
-            .assign(key: AuthAssign.authContext, value: "session")
+            .roost_authenticate(user, context: .session)
             .renewSessionID()
 
         return (conn, token)
@@ -90,14 +88,10 @@ extension Connection {
     /// }
     /// ```
     public func logoutUser() -> Connection {
-        var conn = self
+        self
             .deleteSessionValue(sessionTokenKey)
             .deleteSessionValue(sessionUserIDKey)
-        conn.assigns.removeValue(forKey: AuthAssign.currentUser)
-        conn.assigns.removeValue(forKey: AuthAssign.currentUserID)
-        conn.assigns.removeValue(forKey: AuthAssign.authContext)
-        conn.assigns.removeValue(forKey: AuthAssign.currentScope)
-        return conn
+            .roost_clearAuthentication()
     }
 
     // MARK: Current User
@@ -130,9 +124,7 @@ extension Connection {
     /// }
     /// ```
     public func setCurrentUser<U: Authenticatable>(_ user: U) -> Connection {
-        self
-            .assign(key: AuthAssign.currentUser, value: user)
-            .assign(key: AuthAssign.currentUserID, value: user.authID)
+        roost_authenticate(user, context: nil)
     }
 
     /// Get the authenticated user from assigns, cast to the expected type.
@@ -145,17 +137,26 @@ extension Connection {
     /// }
     /// ```
     public func currentUser<U: Authenticatable>(_ type: U.Type) -> U? {
-        assigns[AuthAssign.currentUser] as? U
+        self[CurrentUserKey.self] as? U
     }
 
     /// `true` when a user has been stored in assigns (i.e. authenticated).
     public var isAuthenticated: Bool {
-        assigns[AuthAssign.currentUserID] != nil
+        roost_untypedAssign(CurrentUserIDKey.self) != nil
     }
 
     /// Identity established by authentication middleware for this request.
     /// Prefer this to the raw session hint (`authUserID`) when scoping queries.
     public var authenticatedUserID: String? {
-        assigns[AuthAssign.currentUserID] as? String
+        self[CurrentUserIDKey.self]
+    }
+
+    /// How the current user authenticated: `.session` after
+    /// ``loginUser(_:remember:token:)``, `.api` after ``setBearerUser(_:)``.
+    ///
+    /// `nil` when no user is authenticated, or when a plug stored the user
+    /// with ``setCurrentUser(_:)``, which doesn't record how.
+    public var authContext: AuthContext? {
+        self[AuthContextKey.self].flatMap(AuthContext.init(rawValue:))
     }
 }

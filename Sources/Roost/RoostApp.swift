@@ -22,14 +22,14 @@ public protocol RoostApp {
     var layout: HTMLLayout? { get }
 
     /// PubSub adapter. Return `nil` for apps that don't need pub/sub.
-    /// Default: `nil`. Override to use `PubSub.inMemory()` or `PubSub.valkey(url:)`.
+    /// Default: `nil`. Override to use `PubSub.inMemory()`, which delivers within one process.
     var pubSub: (any RoostPubSub)? { get }
 
     /// Channel router. Map topic patterns to `Channel` handler types.
     /// Default: empty router (no channels configured).
     var channels: ChannelRouter { get }
 
-    /// Job queue driver. Return `JobQueue.inMemory()` for tests or `JobQueue.postgres(spectro:)` in production.
+    /// Job queue driver. Return `JobQueue.inMemory()`; its jobs don't survive a restart.
     /// Default: `nil` (no job queue configured).
     var jobs: (any RoostJobQueue)? { get }
 

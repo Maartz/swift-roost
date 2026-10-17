@@ -40,6 +40,15 @@ Reference pages include these public declarations so you can inspect their
 contracts. Their presence in the navigator does not mean their external
 transport or storage adapter is complete.
 
+Roost 2.2 deprecates the stubs: `ValkeyPubSub` and `PubSub.valkey(url:)`,
+`JobQueue.postgres(spectro:)`, `PostgresJobStore`, `JobWorker`, `SMTPDelivery`,
+`channel(_:)`, and the TLS and HTTP/2 settings of ``ServerConfig``. Their
+deprecation warnings say what each one does instead. They remain through 2.x,
+and Roost 3.0 removes them from the stable API until they are implemented.
+
+``DriftDetector`` compares schema snapshots, but the `roost` CLI has no command
+that runs it; call it from a test or a CI script.
+
 ### Browser and local playgrounds
 
 The [website playground](https://roost-framework.github.io/swift-roost/playground.html)

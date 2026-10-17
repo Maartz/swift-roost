@@ -264,7 +264,23 @@ struct BearerAuthTests {
         let updated = conn.setBearerUser(user)
 
         #expect(updated.isAuthenticated)
-        #expect(updated.assigns[AuthAssign.authContext] as? String == "api")
+        #expect(updated.authContext == .api)
+    }
+
+    @Test("Apps using the 2.1 AuthAssign string keys see the same authentication state")
+    func stringKeysShareStorage() {
+        let user = TestUser(id: "user-7")
+        let conn = TestConnection.build().setBearerUser(user)
+        #expect(conn.assigns["_roost_current_user"] as? TestUser == user)
+        #expect(conn.assigns["_roost_current_user_id"] as? String == "user-7")
+        #expect(conn.assigns["_roost_auth_context"] as? String == "api")
+
+        var signedOut = conn
+        signedOut.assigns.removeValue(forKey: "_roost_current_user_id")
+        #expect(!signedOut.isAuthenticated)
+
+        let legacy = TestConnection.build().assign(key: "_roost_current_user_id", value: "user-8")
+        #expect(legacy.authenticatedUserID == "user-8")
     }
 }
 
@@ -386,7 +402,7 @@ struct AuthPlugTests {
 
         let result = try await plug(conn)
         #expect(result.currentUser(TestUser.self)?.id == "api-user")
-        #expect(result.assigns[AuthAssign.authContext] as? String == "api")
+        #expect(result.authContext == .api)
     }
 
     @Test("fetchBearerUser is no-op without Authorization header")

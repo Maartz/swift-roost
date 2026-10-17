@@ -17,30 +17,28 @@ struct BookmarkAPIController: Controller {
     }
 
     static func index(_ conn: Connection) async throws -> Connection {
-        try conn.json(value: await BookmarksContext(repo: conn.repo()).listBookmarks(scopeId: readerID(conn)))
+        try conn.json(value: await conn.bookmarks().listBookmarks())
     }
 
     static func show(_ conn: Connection) async throws -> Connection {
         let id: UUID = try conn.requireParam("id")
-        return try conn.json(value: await BookmarksContext(repo: conn.repo()).getBookmark(id: id, scopeId: readerID(conn)))
+        return try conn.json(value: await conn.bookmarks().getBookmark(id: id))
     }
 
     static func create(_ conn: Connection) async throws -> Connection {
-        let scopeId = try readerID(conn)
+        let context = try conn.bookmarks()
         do {
-            let input = try conn.permit(CreateBookmarkInput.self)
-            return try conn.json(status: .created, value: await BookmarksContext(repo: conn.repo()).createBookmark(input, scopeId: scopeId))
+            return try conn.json(status: .created, value: await context.createBookmark(conn.permit(Bookmark.editable)))
         } catch let errors as ValidationErrors {
             return try conn.json(status: .unprocessableContent, value: errors)
         }
     }
 
     static func update(_ conn: Connection) async throws -> Connection {
-        let scopeId = try readerID(conn)
+        let context = try conn.bookmarks()
         let id: UUID = try conn.requireParam("id")
         do {
-            let input = try conn.permit(CreateBookmarkInput.self)
-            return try conn.json(value: await BookmarksContext(repo: conn.repo()).updateBookmark(id: id, with: input, scopeId: scopeId))
+            return try conn.json(value: await context.updateBookmark(id: id, with: conn.permit(Bookmark.editable)))
         } catch let errors as ValidationErrors {
             return try conn.json(status: .unprocessableContent, value: errors)
         }
@@ -48,7 +46,7 @@ struct BookmarkAPIController: Controller {
 
     static func delete(_ conn: Connection) async throws -> Connection {
         let id: UUID = try conn.requireParam("id")
-        try await BookmarksContext(repo: conn.repo()).deleteBookmark(id: id, scopeId: readerID(conn))
+        try await conn.bookmarks().deleteBookmark(id: id)
         return try conn.json(value: ["deleted": true])
     }
 }

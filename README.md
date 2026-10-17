@@ -92,9 +92,11 @@ Peregrine? Follow the [upgrade guide](guides/renaming-to-roost.md).
   compiler rejects a route to an undeclared action or an action without a
   function. `resources` routes REST actions with `only:` and `except:`, and
   controller plugs run before the actions you choose.
-- **Permitted parameters.** `conn.permit(RecipeParams.self)` decodes form, query,
-  path, or JSON parameters into a type, so undeclared fields can't be
-  mass-assigned and invalid values become 422 responses.
+- **Permitted parameters and typed changes.** `conn.permit(RecipeParams.self)`
+  decodes form, query, path, or JSON parameters into a type, and
+  `conn.permit(Recipe.editable)` decodes a model's permitted fields into
+  `Changes` named by key path. Undeclared fields can't be mass-assigned, and
+  invalid values become 422 responses.
 - **Logs and traces per action.** One log line per request names the action,
   route, and parameters, with passwords and tokens filtered. Tracing spans are
   named after routes, with a child span per action.
@@ -106,7 +108,8 @@ Peregrine? Follow the [upgrade guide](guides/renaming-to-roost.md).
   that retain submitted values.
 - **Authentication and ownership.** Generate registration, login, and logout
   with salted password hashing and revocable session tokens. Scoped resources
-  check the authenticated owner on reads, updates, and deletes.
+  check the authenticated owner on reads, updates, and deletes, and a
+  `ScopedRepo` applies that check to every query and write of a context.
 - **Tests close to the application.** Run the application pipeline in-process,
   keep cookies across requests, submit forms, and inject a transaction-owned
   repository for database isolation.

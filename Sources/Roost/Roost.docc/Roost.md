@@ -65,12 +65,19 @@ for the current implementation boundaries.
 - ``ValidationStrategy``
 - ``ValidatorRule``
 
+### Data and ownership
+
+- ``Changes``
+- ``Permitted``
+- ``ScopedRepo``
+
 ### Identity and sessions
 
 - ``Authenticatable``
 - ``Auth``
 - ``AuthError``
 - ``AuthScope``
+- ``AuthContext``
 - ``SessionStore``
 - ``MemorySessionStore``
 - ``RoostToken``

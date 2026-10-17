@@ -70,9 +70,41 @@ Use `conn.authenticatedUserID` after authentication middleware has established
 an identity. `conn.authUserID` is only the raw session hint; it is not a
 replacement for validated identity.
 
+An ``AuthScope`` gives that identity a type. Its ``AuthScope/scopeId`` has the
+type of the owner's primary key, so a `UUID` key needs no string conversion:
+
+```swift
+struct ReaderScope: AuthScope {
+    let userID: UUID
+    var scopeId: UUID? { userID }
+}
+```
+
+Set the scope in the plug that loads the user, and require it where a request
+needs one. ``Nexus/Connection/requireScope(_:)`` throws a 401 when no scope is
+set:
+
+```swift
+// In the fetch-user plug:
+return conn.setCurrentUser(user).setScope(ReaderScope(userID: user.id))
+
+// In a controller:
+let reader = try conn.requireScope(ReaderScope.self)
+let context = BookmarksContext(repo: conn.repo(), reader: reader)
+```
+
+The context then limits every query and write to the reader's records with a
+``ScopedRepo``; see <doc:DataAndMigrations>.
+
 The resource generator accepts `--scope user_id`. Its handlers obtain the
 owner from authentication, and its contexts check that owner on reads,
 updates, and deletes. A submitted `user_id` cannot choose someone else's scope.
+
+Read the authentication state with ``Nexus/Connection/currentUser(_:)``,
+``Nexus/Connection/authenticatedUserID``, ``Nexus/Connection/authContext``, and
+``Nexus/Connection/currentScope(_:)``. Roost stores it under typed assign keys.
+The string keys of `AuthAssign` still reach the same values, but they are
+deprecated and Roost 3.0 removes them.
 
 Browser cookies also authenticate JSON requests in this workflow. Mutating
 requests must supply the current CSRF token, including an `X-CSRF-Token` header

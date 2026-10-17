@@ -123,12 +123,12 @@ Keep `conn.bodyParams` when handling a form error. `conn.permit(_:)` decodes
 form values with ``FormValues``, which keeps their original text. An omitted
 nonoptional Boolean decodes to `false`; an optional empty value can decode to
 `nil`. Decoding failures throw ``ValidationErrors``. Fields the input type
-doesn't declare are ignored.
+doesn't declare, or a ``Permitted`` list leaves out, are ignored.
 
 The generated resource catches those errors and renders the form again with
 the submitted values, field errors, and status `.unprocessableContent` (422).
-Its shared input type also performs domain validation through ``Changeset``,
-so JSON and HTML callers follow the same rules.
+Its context validates the input as well, so JSON and HTML callers follow the
+same rules.
 
 ### Use an inline fragment
 
