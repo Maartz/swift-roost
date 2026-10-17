@@ -18,9 +18,16 @@ and on Valkey in production. One environment variable chooses between them.
   downloads; without the trait, nothing is fetched. Roost connects when the
   server starts and closes the connections after it stops accepting requests.
   While Valkey is unreachable, requests that use the store fail after two
-  seconds, then at once, and recover when it's back.
-- `KeyValueSessionStore()` keeps sessions in the store. Its values must be
-  strings, numbers, booleans, or arrays and dictionaries of those.
+  seconds, then at once, and recover when it's back. Redis works from 6.2.
+  Error messages hide the URL's credentials, also in a URL that can't be
+  parsed.
+- `conn.store` throws for a connection that has no store, such as one a
+  plug's unit test builds, instead of stopping the process.
+- `KeyValueSessionStore()` keeps sessions in the store, whether it's the
+  app's `sessionStore` or installed with `session(store:cookieName:ttl:)`.
+  Its values must be strings, numbers, booleans, or arrays and dictionaries of
+  those. Each session is stored under a hash of its ID, the cookie's value, so
+  listing the store's keys doesn't reveal sessions to sign in with.
 - `MemoryKeyValueStore` encodes, expires, and increments values the way Valkey
   does. `TestApp` gives each test app a fresh one, readable as `app.store`,
   or takes one with `store:`.
@@ -29,7 +36,11 @@ and on Valkey in production. One environment variable chooses between them.
   window slides, instead of starting at each client's first request, so a
   client can't send twice the limit around the end of a window. If the store
   fails, requests are allowed and the error is logged at most once a minute;
-  a store without atomic counters falls back to each process's memory.
+  a store without atomic counters falls back to each process's memory, and
+  isn't asked again. Counters are named by a hash of the client, so an API key
+  read with `by: .header(_:)` isn't stored in the clear.
+- The JSON body of a 429 escapes the message, so a message with quotes is
+  valid JSON.
 - `rateLimit(by: .ip)` uses the socket address when a request has neither
   `X-Forwarded-For` nor `X-Real-IP`. Before, such requests weren't limited.
 

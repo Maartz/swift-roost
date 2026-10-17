@@ -3,6 +3,7 @@ import Hummingbird
 import Logging
 import Nexus
 import NexusRouter
+import NexusTest
 import ServiceLifecycle
 import Testing
 
@@ -154,6 +155,25 @@ struct KeyValueStoreConformanceTests {
         }
     }
 
+    @Test("An expiry applies only to the increment that creates a counter", arguments: StoreBackend.available)
+    func counterExpiryOnCreation(backend: StoreBackend) async throws {
+        try await backend.withStore { store in
+            #expect(try await store.increment("lasting", by: 1, expiringAfter: nil) == 1)
+            #expect(try await store.increment("lasting", by: 1, expiringAfter: .milliseconds(100)) == 2)
+            try await Task.sleep(for: .milliseconds(250))
+            #expect(try await store.get("lasting") == Data("2".utf8))
+        }
+    }
+
+    @Test("A counter that would overflow throws instead of wrapping", arguments: StoreBackend.available)
+    func overflow(backend: StoreBackend) async throws {
+        try await backend.withStore { store in
+            _ = try await store.increment("big", by: .max, expiringAfter: nil)
+            await #expect(performing: { try await store.increment("big", by: 1, expiringAfter: nil) },
+                          throws: kind(.overflow))
+        }
+    }
+
     @Test("Incrementing a value that isn't an integer is undecodable", arguments: StoreBackend.available)
     func incrementText(backend: StoreBackend) async throws {
         try await backend.withStore { store in
@@ -248,14 +268,6 @@ struct MemoryKeyValueStoreTests {
         #expect(await store.count == 1)
     }
 
-    @Test("A counter that would overflow throws instead of wrapping")
-    func overflow() async throws {
-        let store = MemoryKeyValueStore()
-        _ = try await store.increment("count", by: .max, expiringAfter: nil)
-        await #expect(performing: { try await store.increment("count", by: 1, expiringAfter: nil) },
-                      throws: kind(.unsupported))
-    }
-
     @Test("A value JSON can't encode is rejected before it's stored")
     func unencodable() async throws {
         let store = MemoryKeyValueStore()
@@ -306,9 +318,17 @@ struct StoreConfigurationTests {
         #expect(throws: KeyValueStoreError.self) { try ValkeyURL(string) }
     }
 
-    @Test("Error messages hide the URL's password")
+    @Test("Error messages hide the URL's credentials, also when it can't be parsed")
     func redaction() {
-        #expect(ValkeyURL.redacted("valkey://app:secret@host") == "valkey://app:***@host")
+        #expect(ValkeyURL.redacted("valkey://app:secret@host") == "valkey://***@host")
+        #expect(ValkeyURL.redacted("valkey://:pa#ss@cache:6379/1") == "valkey://***@cache:6379/1")
+        #expect(ValkeyURL.redacted("valkey://:p@ss word@cache") == "valkey://***@cache")
+        #expect(ValkeyURL.redacted("valkey://cache:6379") == "valkey://cache:6379")
+        #expect {
+            try ValkeyURL("valkey://:pa#ss word@cache")
+        } throws: { error in
+            !"\(error)".contains("pa#ss")
+        }
         #expect {
             try ValkeyURL("http://app:secret@host")
         } throws: { error in
@@ -471,6 +491,16 @@ private struct CounterApp: RoostApp {
     }
 }
 
+/// Installs the session plug itself, to choose the TTL.
+private struct PluggedSessionApp: RoostApp {
+    var plugs: [Plug] { [session(store: KeyValueSessionStore(), ttl: .seconds(60))] }
+
+    @RouteBuilder var routes: [Route] {
+        POST("/step") { conn in conn.putSessionValue("step", 3).text("saved") }
+        GET("/step") { conn in conn.text("\(conn.sessionValue("step") ?? "none")") }
+    }
+}
+
 private struct StoreSessionApp: RoostApp {
     let sessionStore: (any SessionStore)? = KeyValueSessionStore()
 
@@ -533,8 +563,24 @@ struct KeyValueStoreRequestTests {
         let app = try await TestApp(StoreSessionApp.self)
         let saved = try await app.request(method: .post, path: "/step")
         let id = try #require(saved.cookies["_roost_session"])
-        #expect(try await app.store.get("session:\(id)") != nil)
+        // The key holds the cookie's hash, not the cookie.
+        #expect(try await app.store.get("session:\(Auth.sha256Hex(id))") != nil)
+        #expect(try await app.store.get("session:\(id)") == nil)
         let read = try await app.get("/step", headers: ["Cookie": "_roost_session=\(id)"])
         #expect(read.text == "2.5")
+    }
+
+    @Test("KeyValueSessionStore() uses the app's store when the app installs session(store:) itself")
+    func pluggedSessions() async throws {
+        let app = try await TestApp(PluggedSessionApp.self)
+        let saved = try await app.request(method: .post, path: "/step")
+        #expect(saved.status == .ok)
+        let id = try #require(saved.cookies["_roost_session"])
+        #expect(try await app.get("/step", headers: ["Cookie": "_roost_session=\(id)"]).text == "3")
+    }
+
+    @Test("A connection without a store throws instead of stopping the process")
+    func connectionWithoutStore() async {
+        await #expect(performing: { try await TestConnection.build().store.get("key") }, throws: kind(.misconfigured))
     }
 }

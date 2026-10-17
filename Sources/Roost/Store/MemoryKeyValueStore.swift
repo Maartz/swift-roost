@@ -60,7 +60,7 @@ public actor MemoryKeyValueStore: KeyValueStore {
         }
         let (result, overflow) = current.addingReportingOverflow(amount)
         guard !overflow else {
-            throw KeyValueStoreError(.unsupported, "Incrementing \(key) by \(amount) overflows")
+            throw KeyValueStoreError(.overflow, "Incrementing \(key) by \(amount) overflows")
         }
         entries[key] = (Data(String(result).utf8), expiresAt)
         sweepIfDue()

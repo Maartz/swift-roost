@@ -260,6 +260,20 @@ struct RateLimitPlugTests {
         }
     }
 
+    @Test("A message with quotes and backslashes is valid JSON")
+    func escapedJSONMessage() async throws {
+        let message = #"Slow "down" \ please"#
+        let plug = rateLimit(max: 1, windowSeconds: 60, message: message)
+        let headers = ["X-Forwarded-For": "10.0.0.77", "Accept": "application/json"]
+        _ = try await runRateLimitPlug(buildConn(headers: headers), plug: plug)
+        let result = try await runRateLimitPlug(buildConn(headers: headers), plug: plug)
+        guard case .buffered(let data) = result.responseBody else {
+            Issue.record("Expected buffered body")
+            return
+        }
+        #expect(try JSONDecoder().decode([String: String].self, from: data) == ["error": message])
+    }
+
     // MARK: - Custom 429 message
 
     @Test("custom message appears in 429 response")
@@ -379,13 +393,37 @@ private struct FailingStore: KeyValueStore {
 }
 
 /// Stores values but can't increment, like a Hummingbird persist driver.
-private struct NoCounterStore: KeyValueStore {
+private final class NoCounterStore: KeyValueStore, @unchecked Sendable {
     let base = MemoryKeyValueStore()
-    func get(_ key: String) async throws -> Data? { await base.get(key) }
+    private let lock = NSLock()
+    private var _reads = 0
+    var reads: Int { lock.withLock { _reads } }
+    func get(_ key: String) async throws -> Data? {
+        lock.withLock { _reads += 1 }
+        return await base.get(key)
+    }
     func set(_ key: String, to value: Data, expiringAfter expiry: Duration?) async throws {
         await base.set(key, to: value, expiringAfter: expiry)
     }
     func remove(_ key: String) async throws { await base.remove(key) }
+}
+
+private final class KeyRecordingStore: KeyValueStore, @unchecked Sendable {
+    let base = MemoryKeyValueStore()
+    private let lock = NSLock()
+    private var _keys: [String] = []
+    var keys: [String] { lock.withLock { _keys } }
+    private func record(_ key: String) { lock.withLock { _keys.append(key) } }
+    func get(_ key: String) async throws -> Data? { record(key); return await base.get(key) }
+    func set(_ key: String, to value: Data, expiringAfter expiry: Duration?) async throws {
+        record(key)
+        await base.set(key, to: value, expiringAfter: expiry)
+    }
+    func remove(_ key: String) async throws { record(key); await base.remove(key) }
+    func increment(_ key: String, by amount: Int, expiringAfter expiry: Duration?) async throws -> Int {
+        record(key)
+        return try await base.increment(key, by: amount, expiringAfter: expiry)
+    }
 }
 
 private struct LimitedApp: RoostApp {
@@ -429,7 +467,7 @@ struct RateLimitStoreTests {
             rateLimit(max: max, windowSeconds: 60, by: .header(HTTPField.Name("X-Client")!))
         }
         let store = MemoryKeyValueStore()
-        let login = limited(max: 1), reset = limited(max: 1), api = limited(max: 5)
+        let login = limited(max: 1), reset = limited(max: 1), api = limited(max: 2)
         #expect(try await !login(client("a", store: store)).isHalted)
         #expect(try await reset(client("a", store: store)).isHalted)
         #expect(try await !api(client("a", store: store)).isHalted)
@@ -501,7 +539,21 @@ struct RateLimitStoreTests {
         let store = NoCounterStore()
         #expect(try await !plug(client("a", store: store)).isHalted)
         #expect(try await plug(client("a", store: store)).isHalted)
+        #expect(try await plug(client("a", store: store)).isHalted)
         #expect(messages.all.count == 1)
+        // Only the first request asks the store.
+        #expect(store.reads <= 1)
+    }
+
+    @Test("Counters are named by a hash of the client, which can be a secret")
+    func hashedClients() async throws {
+        let store = KeyRecordingStore()
+        let plug = rateLimit(max: 5, windowSeconds: 60, by: .header(.authorization))
+        var conn = buildConn(headers: ["Authorization": "Bearer s3cret"])
+        conn = conn.assign(KeyValueStoreKey.self, value: store)
+        _ = try await plug(conn)
+        #expect(!store.keys.isEmpty)
+        #expect(store.keys.allSatisfy { !$0.contains("s3cret") && $0.contains(Auth.sha256Hex("Bearer s3cret")) })
     }
 }
 

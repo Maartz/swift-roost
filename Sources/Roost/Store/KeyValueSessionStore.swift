@@ -15,7 +15,8 @@ import Foundation
 public struct KeyValueSessionStore: SessionStore {
     private let backend: (any KeyValueStore)?
 
-    /// Sessions in the app's store, ``RoostApp/store``.
+    /// Sessions in the app's store, ``RoostApp/store``, whether it's
+    /// ``RoostApp/sessionStore`` or installed with `session(store:cookieName:ttl:)`.
     public init() {
         backend = nil
     }
@@ -23,11 +24,6 @@ public struct KeyValueSessionStore: SessionStore {
     /// Sessions in `store`.
     public init(_ store: any KeyValueStore) {
         backend = store
-    }
-
-    /// This store using `store` when it was created without one.
-    func using(_ store: any KeyValueStore) -> KeyValueSessionStore {
-        backend == nil ? KeyValueSessionStore(store) : self
     }
 
     public func get(_ id: String) async throws -> [String: any Sendable]? {
@@ -54,16 +50,18 @@ public struct KeyValueSessionStore: SessionStore {
     }
 
     private func store() throws -> any KeyValueStore {
-        guard let backend else {
+        guard let store = backend ?? RequestKeyValueStore.current else {
             throw KeyValueStoreError(.misconfigured, """
-                KeyValueSessionStore() uses the app's store inside a Roost app or TestApp. \
+                KeyValueSessionStore() uses the app's store while a Roost app or TestApp handles a request. \
                 Elsewhere, pass a store: KeyValueSessionStore(store)
                 """)
         }
-        return backend
+        return store
     }
 
-    private static func key(_ id: String) -> String { "session:\(id)" }
+    /// The session ID is the cookie's value, so the key holds its hash:
+    /// anyone who can list the store's keys can't sign in with them.
+    static func key(_ id: String) -> String { "session:\(Auth.sha256Hex(id))" }
 }
 
 /// A session value with its type, so a `Double` such as `2.0` doesn't come

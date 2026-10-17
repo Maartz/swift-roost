@@ -148,6 +148,8 @@ public struct KeyValueStoreError: Error, Sendable, CustomStringConvertible {
         case unencodable
         /// The store can't perform the operation, such as an atomic increment.
         case unsupported
+        /// An increment would go past `Int.max` or `Int.min`.
+        case overflow
         /// The store's configuration is invalid, such as a malformed URL.
         case misconfigured
         /// The store's server failed or couldn't be reached.
@@ -177,12 +179,27 @@ extension Connection {
     /// ```
     ///
     /// `TestApp` gives each test app its own ``MemoryKeyValueStore``.
+    ///
+    /// - Throws: ``KeyValueStoreError/Kind/misconfigured`` for a connection
+    ///   that didn't come through a Roost app or `TestApp`, such as one a
+    ///   plug's unit test builds, until it's given a store.
     public var store: any KeyValueStore {
-        guard let store = self[KeyValueStoreKey.self] else {
-            fatalError("No key-value store. conn.store is set by RoostApp and TestApp.")
+        get throws {
+            guard let store = self[KeyValueStoreKey.self] else {
+                throw KeyValueStoreError(.misconfigured, """
+                    This connection has no key-value store. RoostApp and TestApp set conn.store; \
+                    a connection built another way needs one assigned.
+                    """)
+            }
+            return store
         }
-        return store
     }
+}
+
+/// The app's store while Roost handles a request, for code that has no
+/// connection, such as a ``KeyValueSessionStore`` installed with `session(store:)`.
+enum RequestKeyValueStore {
+    @TaskLocal static var current: (any KeyValueStore)?
 }
 
 // MARK: - Namespacing

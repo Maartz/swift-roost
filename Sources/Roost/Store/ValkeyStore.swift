@@ -42,11 +42,14 @@ struct ValkeyURL: Equatable {
         }
     }
 
-    /// The URL without its password, for error messages and logs.
+    /// The URL without its credentials, for error messages and logs: whatever
+    /// comes between `://` and the last `@` is hidden, also in a URL
+    /// `URLComponents` can't parse, such as one with an unescaped `#` in its password.
     static func redacted(_ string: String) -> String {
-        guard var components = URLComponents(string: string), components.password != nil else { return string }
-        components.password = "***"
-        return components.string ?? "the store URL"
+        guard let at = string.lastIndex(of: "@") else { return string }
+        let start = string.range(of: "://")?.upperBound ?? string.startIndex
+        guard start <= at else { return string }
+        return string[..<start] + "***" + string[at...]
     }
 }
 
@@ -87,10 +90,11 @@ struct ValkeyKeyValueStore: KeyValueStore {
         try await valkey {
             let key = ValkeyKey(key)
             guard let expiry else { return try await client.incrby(key, increment: amount) }
-            // One transaction, so a new counter can't be left without its expiry.
-            let (count, _) = try await client.transaction(
-                INCRBY(key, increment: amount),
-                PEXPIRE(key, milliseconds: Self.milliseconds(expiry), condition: .nx)
+            // One transaction, so a new counter can't be left without its expiry. SET NX
+            // creates it with the expiry; PEXPIRE's NX option would need Redis 7.
+            let (_, count) = try await client.transaction(
+                SET(key, value: "0", condition: .nx, expiration: .milliseconds(Self.milliseconds(expiry))),
+                INCRBY(key, increment: amount)
             )
             return try count.get()
         }
@@ -111,6 +115,10 @@ struct ValkeyKeyValueStore: KeyValueStore {
         {
             // Matches MemoryKeyValueStore, which reports a non-integer counter the same way.
             throw KeyValueStoreError(.undecodable, "Valkey: \(error.message ?? "value is not an integer")")
+        } catch let error as ValkeyClientError
+            where error.errorCode == .commandError && error.message?.contains("overflow") == true
+        {
+            throw KeyValueStoreError(.overflow, "Valkey: \(error.message ?? "increment would overflow")")
         } catch {
             throw KeyValueStoreError(.unavailable, "Valkey: \(error)")
         }

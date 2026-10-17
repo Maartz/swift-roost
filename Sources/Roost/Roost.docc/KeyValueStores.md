@@ -54,6 +54,10 @@ across servers, and a new counter starts its expiry when it's created.
 `fetch` returns a stored value or computes, stores, and returns a new one; a
 stored value of an older type counts as missing.
 
+Every request a Roost app or `TestApp` handles has a store. A connection built
+another way, such as one a plug's unit test makes, has none until you assign
+one, and `conn.store` throws.
+
 Contexts take `any KeyValueStore`, as they take `any Repo`, so a test can pass
 its own ``MemoryKeyValueStore``:
 
@@ -79,6 +83,11 @@ they survive deploys and work behind a load balancer:
 let sessionStore: (any SessionStore)? = KeyValueSessionStore()
 ```
 
+It also works when the app installs `session(store:cookieName:ttl:)` itself
+to choose the cookie or the TTL. Each session is stored under a hash of its
+ID, which is the cookie's value, so someone who can list the store's keys
+can't sign in with them.
+
 Session values must be strings, numbers, booleans, or arrays and dictionaries
 of those. Store a `UUID` or a `Date` as a string. Saving another type throws,
 with every store, so the mistake shows up during development.
@@ -103,9 +112,10 @@ Then set `ROOST_STORE_URL`:
 | `valkey://app:password@cache.internal` | As the user `app` |
 | `valkeys://cache.internal` | With TLS |
 
-`redis://` and `rediss://` work the same way. Percent-encode special
-characters in a password, such as `%40` for `@`. On macOS, the Valkey client
-needs macOS 15 or later; Linux has no such requirement.
+`redis://` and `rediss://` work the same way, with Redis 6.2 or later.
+Percent-encode special characters in a password, such as `%40` for `@`; error
+messages hide the credentials either way. On macOS, the Valkey client needs
+macOS 15 or later; Linux has no such requirement.
 
 Roost connects when the server starts and closes the connections after the
 server stops accepting requests. If Valkey becomes unreachable, the first
@@ -134,9 +144,10 @@ var plugs: [Plug] {
 The window slides, so a client can't send twice the limit around the moment
 one window ends and the next begins. Limits created at the same place in the
 code, with the same `max` and window, share counters, even when a helper
-creates them for different routes; pass `name:` to keep them apart. If the store
-fails, requests are allowed and the error is logged, so a Valkey outage
-doesn't take the app down.
+creates them for different routes; pass `name:` to keep them apart. Counters
+are named by a hash of the client, so a key such as an API key read with
+`by: .header(_:)` isn't stored in the clear. If the store fails, requests are
+allowed and the error is logged, so a Valkey outage doesn't take the app down.
 
 ### Choose the store in code
 

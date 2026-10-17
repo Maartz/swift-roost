@@ -23,8 +23,9 @@ application. Bootstrap installs its session middleware before application
 middleware, and `RoostTest.TestApp` follows the same rule.
 
 To customize cookie name or TTL, install `session(store:cookieName:ttl:)`
-directly in `plugs` instead of configuring `sessionStore`. Choose one method.
-The defaults are `_roost_session` and 24 hours.
+directly in `plugs` instead of configuring `sessionStore`. Choose one method;
+`KeyValueSessionStore()` uses the app's store either way. The defaults are
+`_roost_session` and 24 hours.
 
 ``KeyValueSessionStore`` keeps sessions in the app's key-value store. That
 store is in memory until you set `ROOST_STORE_URL`; with Valkey, sessions

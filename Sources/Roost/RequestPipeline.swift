@@ -25,12 +25,12 @@ package func roost_applicationPipeline<App: RoostApp>(
         if let pubSub { result = result.assign(PubSubKey.self, value: pubSub) }
         return result
     }]
-    if let sessions = app.sessionStore {
-        plugs.append(session(store: (sessions as? KeyValueSessionStore)?.using(store) ?? sessions))
-    }
+    if let sessions = app.sessionStore { plugs.append(session(store: sessions)) }
     plugs += app.plugs
     plugs.append { conn in try await router(conn) }
-    return roost_liveReload(roost_requestPipeline(plugs, customErrorPage: app.customErrorPage))
+    let handle = roost_liveReload(roost_requestPipeline(plugs, customErrorPage: app.customErrorPage))
+    // `KeyValueSessionStore()` has no connection, wherever it's installed, so it reads the store from the task.
+    return { conn in try await RequestKeyValueStore.$current.withValue(store) { try await handle(conn) } }
 }
 
 /// The response lifecycle shared by the server and the in-process test harness.

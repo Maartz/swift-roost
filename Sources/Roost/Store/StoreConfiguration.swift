@@ -144,17 +144,17 @@ actor ProductionMemoryStore: KeyValueStore {
 
     func get(_ key: String) async throws -> Data? {
         warnOnce()
-        return try await base.get(key)
+        return await base.get(key)
     }
 
     func set(_ key: String, to value: Data, expiringAfter expiry: Duration?) async throws {
         warnOnce()
-        try await base.set(key, to: value, expiringAfter: expiry)
+        await base.set(key, to: value, expiringAfter: expiry)
     }
 
     func remove(_ key: String) async throws {
         warnOnce()
-        try await base.remove(key)
+        await base.remove(key)
     }
 
     func increment(_ key: String, by amount: Int, expiringAfter expiry: Duration?) async throws -> Int {

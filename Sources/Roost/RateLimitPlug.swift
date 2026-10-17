@@ -86,6 +86,9 @@ func roost_rateLimit(
     logger: Logger = Logger(label: "roost.ratelimit")
 ) -> Plug {
     let window = RateLimitWindow(max: max, seconds: Swift.max(1, windowSeconds), name: name)
+    // JSONEncoder escapes quotes and backslashes in the message.
+    let errorBody = (try? JSONEncoder().encode(["error": message])).map { String(decoding: $0, as: UTF8.self) }
+        ?? #"{"error": "Too Many Requests"}"#
     let fallback = MemoryKeyValueStore()
     let warnings = RateLimitWarnings(logger: logger)
 
@@ -95,7 +98,9 @@ func roost_rateLimit(
 
         let counts: RateLimitWindow.Counts
         do {
-            counts = try await window.count(client, at: time, in: conn[KeyValueStoreKey.self] ?? fallback)
+            // After a store says it can't count atomically, don't ask it again.
+            let store = warnings.storeIsUnsupported ? fallback : conn[KeyValueStoreKey.self] ?? fallback
+            counts = try await window.count(client, at: time, in: store)
         } catch let error as KeyValueStoreError where error.kind == .unsupported {
             warnings.unsupported(error)
             counts = try await window.count(client, at: time, in: fallback)
@@ -116,8 +121,7 @@ func roost_rateLimit(
 
             if requestsJSON(conn) {
                 updated.response.headerFields[.contentType] = "application/json"
-                let body = #"{"error": "\#(message)"}"#
-                updated.responseBody = .string(body)
+                updated.responseBody = .string(errorBody)
             } else {
                 updated.responseBody = .string(message)
             }
@@ -157,11 +161,14 @@ struct RateLimitWindow: Sendable {
     /// Counts this request in the current window and reads the previous one.
     func count(_ client: String, at time: Date, in store: any KeyValueStore) async throws -> Counts {
         let index = windowIndex(at: time)
+        let client = Auth.sha256Hex(client)
         // A window's counter is read as the previous one until the next window ends.
         async let current = store.increment(key(client, index), by: 1, expiringAfter: .seconds(2 * seconds))
         async let previous = store.get(key(client, index - 1))
+        // The increment first, so a store that can't count reports that, not a failed read.
+        let currentCount = try await current
         let previousCount = try await previous.flatMap { Int(String(decoding: $0, as: UTF8.self)) } ?? 0
-        return Counts(current: try await current, previous: previousCount)
+        return Counts(current: currentCount, previous: previousCount)
     }
 
     func decide(_ counts: Counts, at time: Date) -> Decision {
@@ -196,8 +203,10 @@ struct RateLimitWindow: Sendable {
         Int((time.timeIntervalSince1970 / Double(seconds)).rounded(.down))
     }
 
-    private func key(_ client: String, _ index: Int) -> String {
-        "ratelimit:\(name):\(client):\(index)"
+    /// The client is hashed, because it can be a secret, such as an API key
+    /// read with `.header`, and keys are easier to list than values.
+    private func key(_ clientHash: String, _ index: Int) -> String {
+        "ratelimit:\(name):\(clientHash):\(index)"
     }
 }
 
@@ -209,6 +218,9 @@ private final class RateLimitWarnings: @unchecked Sendable {
     private var lastFailure: Date?
 
     init(logger: Logger) { self.logger = logger }
+
+    /// `true` once the store has thrown ``KeyValueStoreError/Kind/unsupported``.
+    var storeIsUnsupported: Bool { lock.withLock { warnedUnsupported } }
 
     func unsupported(_ error: KeyValueStoreError) {
         let first = lock.withLock { () -> Bool in
