@@ -28,6 +28,14 @@ extension Note {
     }
 }
 
+/// Multi-word properties, which `@Schema` encodes in snake_case.
+@Schema("reminders")
+struct Reminder {
+    @ID var id: UUID
+    @Column var remindAt: String?
+    @Column var contactID: String
+}
+
 @Schema("archived_notes")
 struct ArchivedNote {
     @ID var id: UUID
@@ -124,6 +132,13 @@ struct ChangesTests {
         #expect(Set(sent.keys) == ["pinned", "updatedAt"])
         #expect(sent["pinned"] as? Bool == true)
     }
+
+    @Test("Repo.update without changes doesn't touch updatedAt")
+    func emptyUpdate() async throws {
+        let repo = RecordingRepo()
+        _ = try await repo.update(Note.self, id: UUID(), Changes())
+        #expect(repo.updates.isEmpty)
+    }
 }
 
 // MARK: - Permitted
@@ -172,15 +187,38 @@ struct PermittedTests {
         #expect(changes[\.pinned] == true)
     }
 
-    @Test("conn.permit decodes JSON bodies; a missing optional is nil")
+    @Test("conn.permit decodes JSON bodies; a missing optional is left unchanged and null clears it")
     func connectionJSON() throws {
         let conn = TestConnection.buildJSON(json: #"{"title": "Plan", "pinned": true, "rating": 4, "ownerId": "x"}"#)
         let changes = try conn.permit(Note.editable)
         #expect(changes[\.title] == "Plan")
-        #expect(changes[\.body] == .some(nil))
+        #expect(!changes.contains(\.body))
         #expect(changes[\.pinned] == true)
         #expect(changes[\.rating] == 4)
         #expect(!changes.contains(\.ownerId))
+
+        let cleared = try TestConnection.buildJSON(json: #"{"title": "Plan", "body": null, "pinned": true, "rating": 4}"#)
+            .permit(Note.editable)
+        #expect(cleared.contains(\.body))
+        #expect(cleared[\.body] == .some(nil))
+    }
+
+    @Test("A JSON body may name fields as @Schema encodes them, or in the usual snake_case")
+    func connectionJSONSnakeCase() throws {
+        let permitted = Permitted<Reminder>(\.remindAt, \.contactID)
+        let encoded = try TestConnection.buildJSON(json: #"{"remind_at": "noon", "contact_i_d": "a"}"#).permit(permitted)
+        #expect(encoded[\.remindAt] == "noon")
+        #expect(encoded[\.contactID] == "a")
+
+        let usual = try TestConnection.buildJSON(json: #"{"remindAt": "dawn", "contact_id": "b"}"#).permit(permitted)
+        #expect(usual[\.remindAt] == "dawn")
+        #expect(usual[\.contactID] == "b")
+
+        #expect {
+            try TestConnection.buildJSON(json: #"{"remind_at": "noon"}"#).permit(permitted)
+        } throws: { error in
+            (error as? ValidationErrors)?["contactID"] == ["can't be blank"]
+        }
     }
 
     @Test("JSON errors name every field; a body that isn't an object is a bad request")
@@ -268,6 +306,17 @@ struct ScopedRepoTests {
         #expect(statement.parameters[0].string == "Plan")
         #expect(statement.parameters[2].uuid == id)
         #expect(statement.parameters[3].uuid == owner)
+    }
+
+    @Test("update without changes, or changing only the owner, reads the record without writing")
+    func updateWithoutChanges() async throws {
+        var note = Note()
+        note.ownerId = owner
+        let repo = RecordingRepo(stored: note)
+        let notes = repo.scoped(\Note.ownerId, to: owner)
+        _ = try await notes.update(id, Changes())
+        _ = try await notes.update(id, Changes().setting(\.ownerId, to: UUID()))
+        #expect(repo.statements.isEmpty)
     }
 
     @Test("delete matches the primary key and the owner, and soft deletes when the schema does")

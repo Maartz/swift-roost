@@ -55,11 +55,13 @@ input type, its normalization, an insert, and an update dictionary.
 - `Changes<Model>` holds the values to write to a model, each named by a key
   path, so the compiler checks the property and the value's type.
   `repo.update(_:id:_:)` writes them. Writes through `Changes` set an
-  `updatedAt` timestamp unless the changes set it.
+  `updatedAt` timestamp unless the changes set it; empty changes write nothing.
 - `Permitted<Model>(\.title, \.url)` lists the fields a request may set.
   `conn.permit(_:)` decodes them from forms and JSON into `Changes` and reports
   every invalid field, not just the first. `FormValues.decode(_:)` does the
-  same outside a request.
+  same outside a request. A JSON body may use the snake_case names `@Schema`
+  encodes, such as `read_at`, and an optional field it leaves out stays
+  unchanged, so a partial update doesn't clear it.
 - `ValidatorRule` has key path rules for `Changes`, such as `.required(\.title)`
   and `.length(\.note, max: 2000)`. They name each field after the schema
   property instead of a repeated string.
@@ -74,7 +76,8 @@ input type, its normalization, an insert, and an update dictionary.
   `conn.authContext` reports whether the user signed in with a session or a
   bearer token.
 - Roost stores authentication and the scope under typed assign keys. The
-  `AuthAssign` string keys still reach the same values.
+  `AuthAssign` string keys still reach the same values, and as in 2.1, any
+  value under `AuthAssign.currentUserID` authenticates the request.
 - The example app uses all of the above. `BookmarksContext` holds a
   `ScopedRepo`, `ReaderScope` carries the reader's `UUID`, and
   `Bookmark.editable` lists the editable fields once.
