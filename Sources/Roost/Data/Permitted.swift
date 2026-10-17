@@ -95,7 +95,12 @@ extension Permitted.Field {
                 changes.set(keyPath, to: try container.decode(Value.self, forKey: FieldKey(name)))
                 return
             }
-            changes.set(keyPath, to: try container.decode(Value.self, forKey: key))
+            do {
+                changes.set(keyPath, to: try container.decode(Value.self, forKey: key))
+            } catch let error as DecodingError {
+                // Errors name the property, whichever spelling the body used.
+                throw error.renamingField(key.stringValue, to: name)
+            }
         }
     }
 }
@@ -211,6 +216,26 @@ private struct FieldKey: CodingKey {
             previous = character
         }
         return result
+    }
+}
+
+extension DecodingError {
+    /// This error with the top-level field `alias` in its path named `name` instead.
+    fileprivate func renamingField(_ alias: String, to name: String) -> DecodingError {
+        guard alias != name else { return self }
+        func renamed(_ context: Context) -> Context {
+            var path = context.codingPath
+            if path.first?.stringValue == alias { path[0] = FieldKey(name) }
+            return Context(codingPath: path, debugDescription: context.debugDescription,
+                           underlyingError: context.underlyingError)
+        }
+        switch self {
+        case .typeMismatch(let type, let context): return .typeMismatch(type, renamed(context))
+        case .valueNotFound(let type, let context): return .valueNotFound(type, renamed(context))
+        case .keyNotFound(let key, let context): return .keyNotFound(key, renamed(context))
+        case .dataCorrupted(let context): return .dataCorrupted(renamed(context))
+        @unknown default: return self
+        }
     }
 }
 

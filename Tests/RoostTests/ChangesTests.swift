@@ -219,6 +219,12 @@ struct PermittedTests {
         } throws: { error in
             (error as? ValidationErrors)?["contactID"] == ["can't be blank"]
         }
+        // An invalid value is named after the property too, not the spelling the body used.
+        #expect {
+            try TestConnection.buildJSON(json: #"{"remind_at": 5, "contact_id": 7}"#).permit(permitted)
+        } throws: { error in
+            (error as? ValidationErrors)?.fieldErrors == ["remindAt": ["is invalid"], "contactID": ["is invalid"]]
+        }
     }
 
     @Test("JSON errors name every field; a body that isn't an object is a bad request")
@@ -279,8 +285,18 @@ struct ChangesValidationTests {
     @Test("A nil optional passes its rules unless required")
     func optionalFields() async throws {
         let empty = Changes<Note>().setting(\.body, to: nil)
-        _ = try await empty.validated(using: [.length(\.body, min: 2), .format(\.body, pattern: "^x")])
+        _ = try await empty.validated(using: [
+            .length(\.body, min: 2), .format(\.body, pattern: "^x"), .email(\.body), .url(\.body),
+            .inclusion(\.body, in: ["a", "b"]), .exclusion(\.body, from: ["a"]),
+        ])
         await #expect(throws: ValidationErrors.self) { try await empty.validated(using: [.required(\.body)]) }
+
+        let set = Changes<Note>().setting(\.body, to: "c")
+        await #expect {
+            try await set.validated(using: [.inclusion(\.body, in: ["a", "b"]), .custom(\.body) { $0 == "c" ? "is c" : nil }])
+        } throws: { error in
+            (error as? ValidationErrors)?["body"] == ["is not included in the list", "is c"]
+        }
     }
 }
 

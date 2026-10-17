@@ -149,3 +149,36 @@ func contextRollback() async throws {
     }
     await client.shutdown()
 }
+
+@Test("An OR condition on a scoped query stays inside the owner's records")
+func scopedQueryWithOr() async throws {
+    let config = Database.postgres(database: "roost")
+    let client = try SpectroClient(hostname: config.hostname, port: config.port,
+        username: config.username, password: config.password, database: config.database)
+    let repo = client.repository()
+    do {
+        try await withTestRollback(repository: repo) { transaction in
+            var readers: [User] = []
+            for name in ["alice", "bob"] {
+                var fixture = User()
+                fixture.email = "\(name)-\(UUID())@example.test"
+                fixture.hashedPassword = "unused by this test"
+                readers.append(try await transaction.insert(fixture))
+            }
+            for reader in readers {
+                _ = try await transaction.scoped(\Bookmark.userId, to: reader.id)
+                    .insert(link("Read by \(reader.email)").setting(\.read, to: true))
+            }
+            // Spectro before 2.3.1 joined clauses without parentheses: owner AND title OR read.
+            let found = try await transaction.scoped(\Bookmark.userId, to: readers[0].id).query()
+                .where { $0.title == "nothing" || $0.read == true }
+                .all()
+            #expect(found.count == 1)
+            #expect(found.allSatisfy { $0.userId == readers[0].id })
+        }
+    } catch {
+        await client.shutdown()
+        throw error
+    }
+    await client.shutdown()
+}

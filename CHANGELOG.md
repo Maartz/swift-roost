@@ -97,9 +97,20 @@ Apps compile unchanged, with deprecation warnings for:
   instead: stop the process, do nothing, or go unused. Roost 3.0 removes them
   from the stable API until they are implemented.
 
-Code that reads `scopeId` from an `any AuthScope` value now gets
-`(any Hashable & Sendable)?` instead of `String?`. Read it from the concrete
-scope type instead.
+`AuthScope` has an associated type, which changes code that works with any
+scope rather than a concrete one:
+
+- Reading `scopeId` from an `any AuthScope` value gets
+  `(any Hashable & Sendable)?` instead of `String?`. Read it from the concrete
+  scope type instead.
+- Generic code gets `S.ScopeID?`, so `func id<S: AuthScope>(_ scope: S) -> String? { scope.scopeId }`
+  no longer compiles. Add `where S.ScopeID == String`, or return `S.ScopeID?`.
+- `AuthScope` used as a type is an existential, which Swift 6's `ExistentialAny`
+  setting reports. Write `any AuthScope`.
+
+Roost now requires Spectro 2.3.1 or later. Spectro 2.3.0 joined `where`
+clauses without parentheses, so an `||` condition on `ScopedRepo.query()`
+could return another owner's records. `swift package update` picks it up.
 
 ## 2.1.3
 

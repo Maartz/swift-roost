@@ -37,7 +37,7 @@ let package = Package(
         // `roost spectro` builds the app's own spectro command, which needs `CLI`. Roost's
         // `RichTerminal` trait passes Spectro's on; without it spectro prints plain text
         // and Noora is not fetched.
-        ecosystem("Spectro", from: "2.3.0", traits: [
+        ecosystem("Spectro", from: "2.3.1", traits: [
             "CLI",
             .trait(name: "RichTerminal", condition: .when(traits: ["RichTerminal"])),
         ]),

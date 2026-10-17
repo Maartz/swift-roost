@@ -61,9 +61,9 @@ key and the owner in one SQL statement, so a method doesn't read a record
 before changing it. Another owner's record and a missing one are both a 404.
 `insert(_:)` sets the owner itself, so a request can't choose it.
 
-Contexts generated before Roost 2.2 pass the owner to each method and keep the
-ownership predicate in every query. That style still works; a scoped
-repository removes the need to repeat it.
+Contexts that pass the owner to each method and keep the ownership predicate
+in every query, as roost-cli generates them, still work; a scoped repository
+removes the need to repeat it.
 
 ### Write typed changes
 
