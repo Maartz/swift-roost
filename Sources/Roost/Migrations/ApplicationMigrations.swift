@@ -8,13 +8,25 @@ extension RoostApp {
     ///
     /// When the app declares ``RoostApp/migrations``, Spectro's migration command
     /// runs the registry and also accepts `plan` and its options. `down` without
-    /// `--step` still rolls back only the newest migration.
+    /// `--step` still rolls back only the newest migration; `down --all` rolls
+    /// back every one.
     ///
     /// - Returns: The process exit status.
     package func runMigrationCommand(_ arguments: [String]) async throws -> Int32 {
         if let migrations {
             let database = database, app = "\(Self.self)"
-            return await MigrationCommand.run(arguments: Self.registryArguments(arguments), migrations: migrations) {
+            let spectroArguments: [String]
+            do {
+                spectroArguments = try Self.registryArguments(arguments)
+            } catch {
+                FileHandle.standardError.write(Data("Error: \(error)\n".utf8))
+                return 64  // EX_USAGE
+            }
+            // Spectro's help says that `down` without `--step` rolls back everything.
+            if arguments.contains(where: { $0 == "--help" || $0 == "-h" }) || arguments.first == "help" {
+                print("In \(app), `down` without --step rolls back only the newest migration; `down --all` rolls back every one.\n")
+            }
+            return await MigrationCommand.run(arguments: spectroArguments, migrations: migrations) {
                 guard let config = database else { throw MigrationCommandError("No database configured in \(app).") }
                 return DatabaseConfiguration(hostname: config.hostname, port: config.port,
                     username: config.username, password: config.password, database: config.database)
@@ -45,11 +57,16 @@ extension RoostApp {
     }
 
     /// Spectro's `down` rolls back every migration unless `--step` is given.
-    /// `roost migrate down` has always meant the newest one, so keep that.
-    package static func registryArguments(_ arguments: [String]) -> [String] {
-        guard arguments.first == "down",
-              !arguments.contains(where: { $0 == "--step" || $0.hasPrefix("--step=") || $0 == "--help" || $0 == "-h" })
-        else { return arguments }
+    /// `roost migrate down` has always meant the newest one, so keep that, and
+    /// turn `down --all` into Spectro's bare `down`.
+    package static func registryArguments(_ arguments: [String]) throws -> [String] {
+        guard arguments.first == "down" else { return arguments }
+        let hasStep = arguments.contains { $0 == "--step" || $0.hasPrefix("--step=") }
+        if arguments.contains("--all") {
+            guard !hasStep else { throw MigrationCommandError("Pass --step or --all to down, not both.") }
+            return arguments.filter { $0 != "--all" }
+        }
+        guard !hasStep, !arguments.contains(where: { $0 == "--help" || $0 == "-h" }) else { return arguments }
         return arguments + ["--step", "1"]
     }
 }

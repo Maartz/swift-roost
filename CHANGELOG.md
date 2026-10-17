@@ -82,8 +82,9 @@ input type, its normalization, an insert, and an update dictionary.
   bundled SQL history, from Spectro's `SpectroMigrations`, which `import Roost`
   now includes. `App migrate` and `roost migrate` then run it through Spectro's
   migration command, and `App migrate plan` prints the SQL without a database.
-  `down` still rolls back one migration unless given `--step`. Apps without a
-  registry keep running `Sources/Migrations/`.
+  `down` still rolls back one migration unless given `--step`, and
+  `down --all` rolls back every one. Apps without a registry keep running
+  `Sources/Migrations/`.
 - The example app bundles its generated SQL and adds three Swift migrations:
   a `read_at` column the database keeps in step with `read`, an index that
   matches the reading queue's query, and a check that links are http or https.

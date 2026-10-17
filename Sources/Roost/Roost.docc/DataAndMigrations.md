@@ -195,7 +195,8 @@ With a registry, `App migrate` runs Spectro's migration command, and
 `roost migrate up`, `down`, and `status` keep working. `App migrate plan`
 prints the SQL of every migration without connecting to a database;
 `plan --direction down` prints the rollbacks. `down` rolls back only the
-newest migration unless you pass `--step`. `roost gen migration` still writes
+newest migration unless you pass `--step`, or `--all` to roll back every one.
+`roost gen migration` still writes
 SQL to `Sources/Migrations/`, which a registry doesn't read: write Swift
 migrations by hand for now.
 
