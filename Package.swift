@@ -47,7 +47,8 @@ let package = Package(
         ]),
         // Roost doesn't use Nexus's Vapor adapter.
         ecosystem("Nexus", from: "2.1.0", traits: []),
-        ecosystem("ESW", from: "1.6.0"),
+        ecosystem("ESW", from: "1.7.0"),
+        .package(url: "https://github.com/swift-server/swift-service-lifecycle", from: "2.12.1"),
         .package(
             url: "https://github.com/hummingbird-project/hummingbird.git",
             from: "2.0.0"
@@ -89,6 +90,8 @@ let package = Package(
                 .product(name: "NexusRouter", package: "Nexus"),
                 .product(name: "NexusHummingbird", package: "Nexus"),
                 .product(name: "ESW", package: "esw"),
+                .product(name: "ESWLive", package: "esw"),
+                .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Metrics", package: "swift-metrics"),

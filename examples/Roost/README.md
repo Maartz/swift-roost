@@ -2,8 +2,8 @@
 
 The Roost reading-list example, built with the **Roost.** web framework. Save links and notes, mark things as
 read, and keep each reader's queue private. The pages are ESW templates; the HTML
-forms and JSON API call the same Spectro-backed context. There is no JavaScript
-build step.
+forms, live events, and JSON API call the same Spectro-backed context. ESWLive updates
+reading state and counters without navigation. There is no JavaScript build step.
 
 Pages use ordinary Swift view files, for example `auth/RegisterView.swift`, with
 `@ESWTemplate("register.esw")`. The templates start directly with HTML. View structs
@@ -17,7 +17,7 @@ and bookmark actions. SwiftPM tracks both the Swift sources and templates.
 From this directory:
 
 ```sh
-./dev
+ROOST_FRAMEWORK_PATH=../.. ./dev
 ```
 
 Open **http://127.0.0.1:4000**. The local demo account is:
@@ -37,13 +37,9 @@ Your development data remains available for the next run.
 Prerequisites: Swift 6.3+, Python 3, a local PostgreSQL server, and `psql`,
 `createdb`, and `dropdb` on `PATH`. On Linux, Nexus also needs `zlib1g-dev`.
 
-The app requires **Roost from 2.1.0, ESW from 1.6.0, Spectro from 2.3.0, and
-Nexus from 2.1.0** and fetches them from GitHub. No local package dependency is required. If you
-previously used local dependencies, clear all overrides before starting:
-
-```sh
-unset ROOST_FRAMEWORK_PATH ROOST_ESW_PATH ROOST_ECOSYSTEM_PATH
-```
+The live frontend currently requires **this Roost checkout**, with **ESW from
+1.7.0**. Set `ROOST_FRAMEWORK_PATH=../..` as above until these APIs are released.
+Companion packages still resolve from their published versions by default.
 
 The helper builds the CLI from the containing release checkout. The application
 itself downloads the framework through SwiftPM, including when opened in an
@@ -70,12 +66,12 @@ local PostgreSQL; deployment configuration is outside their scope.
 1. Log in to the demo to see three unread links and one finished link.
 2. Save a link. Leave the title blank or enter an incomplete URL to see a 422
    response with field errors and the entered values preserved.
-3. Click the circle beside a link. It moves to **Finished** without changing its
+3. Click the circle beside a link. It moves to **Finished** and updates the counters without reloading or changing its
    title, URL, or note. Open **Details** to edit it or move it back.
 4. Visit `/api/bookmarks` in the same browser to see the JSON representation.
 5. Create another account. Its queue is empty, and the first reader's record
    URLs return 404.
-6. Change a heading in `Sources/RoostExample/Views/bookmarks/index.esw`, wait for the
+6. Change a heading in `Sources/RoostExample/Views/bookmarks/index.live.hesw`, wait for the
    rebuild, and refresh.
 
 ## Start with three generators
@@ -231,3 +227,37 @@ The remaining friction is visible in this example:
   packages. It does not require using local dependency checkouts.
 
 These files are a small, runnable example of the present framework surface.
+
+## Live page and browser regression tests
+
+`BookmarksLive` loads page data and handles the `read` event with the current
+request's `BookmarksContext`. `RoostExample.readingQueue` is a stable `LiveRoute`,
+registered in both `routes` and `services`. Login and logout invalidate its open
+views. Filters use ordinary links, so their URL remains bookmarkable. Forms
+still POST normally with JavaScript disabled.
+
+The client shows saving, offline, expired, and error states. Reconnection keeps
+pending event IDs, and removing the last visible row returns focus to the queue
+heading. Live state belongs to this server process; separate tabs don't receive
+each other's database changes automatically.
+
+With an isolated PostgreSQL database configured by `DB_*`, run:
+
+```sh
+export ROOST_FRAMEWORK_PATH=../..
+swift build --product RoostExample
+swift run --skip-build RoostExample migrate up
+swift test
+npm ci --prefix BrowserTests
+# Linux: install the browser and its system dependencies.
+npx --prefix BrowserTests playwright install --with-deps chromium
+npm test --prefix BrowserTests
+```
+
+The browser suite starts the built app on a free loopback port, creates test
+accounts and bookmarks in that database, and stops its server afterward. On
+macOS it uses installed Google Chrome; elsewhere it uses Playwright Chromium.
+It checks live updates, DOM identity, offline recovery, lost acknowledgements,
+errors, ownership, CSRF, native form fallback, logout, focus, and graceful
+shutdown with an active stream. Screenshots and server output are written under
+`BrowserTests/artifacts/` (ignored by Git).

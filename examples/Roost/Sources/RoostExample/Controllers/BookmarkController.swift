@@ -22,9 +22,8 @@ struct BookmarkController: Controller {
     }
 
     static func index(_ conn: Connection) async throws -> Connection {
-        let bookmarks = try await conn.bookmarks().listBookmarks()
-        let filter = ReadingFilter(rawValue: conn.queryParams["filter"] ?? "") ?? .unread
-        return try conn.render(BookmarksIndexView(bookmarks: bookmarks, filter: filter), title: "Your reading queue")
+        try await RoostExample.readingQueue.render(conn, title: "Your reading queue",
+            context: LiveContext(parameters: ["filter": conn.queryParams["filter"] ?? ""]))
     }
 
     static func new(_ conn: Connection) async throws -> Connection {

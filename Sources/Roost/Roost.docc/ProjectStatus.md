@@ -4,8 +4,8 @@ Distinguish the implemented application workflow from development integrations.
 
 ## Overview
 
-This catalog documents Roost 2.1.3 and its generators. Releases before 2.0.0
-use the earlier Peregrine module and executable names.
+This catalog documents the current checkout, including the unreleased live-page
+integration. Releases before 2.0.0 use the earlier Peregrine module and executable names.
 
 The core development path is a PostgreSQL-backed app with authentication,
 ownership-scoped resources, HTML and JSON responses, Spectro migrations,
@@ -14,8 +14,8 @@ and in-process tests.
 ### Dependency and release boundaries
 
 The framework and generated applications use published Nexus 2.x starting at 2.1.0,
-Spectro 2.x starting at 2.3.0, and ESW 1.6.0. ESW's release includes typed views and namespaced generated
-output. Roost 2.0.0 is the first release with the renamed modules and CLI;
+Spectro 2.x starting at 2.3.1, and ESW 1.7.0 for the live runtime. ESW includes
+typed views and namespaced generated output. Roost 2.0.0 is the first release with the renamed modules and CLI;
 follow <doc:GettingStarted> to create an app using released dependencies.
 
 The acceptance check in [roost-cli](https://github.com/roost-framework/roost-cli)
@@ -35,7 +35,7 @@ does not run that check or establish production readiness.
 | Mail | Logger and test deliveries are available; SMTP delivery is a stub. |
 | Channels | In-process registry and test helpers exist; the HTTP upgrade route is a stub. |
 | TLS / HTTP/2 | Configuration types exist; application bootstrap does not wire them into the server. |
-| Live views | The separate local Roost Playground integrates ESW Live; this is not a Phoenix LiveView implementation. |
+| Live pages | `LivePage` and `LiveRoute` integrate ESWLive over SSE and POST, with session ownership, CSRF, reconnects, and shutdown. State is process-local; see <doc:LivePages>. |
 
 Reference pages include these public declarations so you can inspect their
 contracts. Their presence in the navigator does not mean their external

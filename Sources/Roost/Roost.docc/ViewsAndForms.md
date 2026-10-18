@@ -8,8 +8,8 @@ Roost re-exports ESW, but file templates need a direct ESW package dependency an
 `ESWBuildPlugin` on the application target. `roost new MyApp` configures both.
 An app generated with `--no-esw` does not have that setup.
 
-The typed-view APIs below are available in ESW 1.6.0, the minimum version used
-by Roost.
+The typed-view APIs are available since ESW 1.6.0. Roost requires ESW 1.7.0
+for its live runtime and structured templates; see <doc:LivePages>.
 
 ### Define a typed view
 

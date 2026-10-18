@@ -129,3 +129,15 @@ input[type="checkbox"] { accent-color: var(--blue); width: 18px; height: 18px; }
     .site-footer { align-items: flex-start; flex-direction: column; gap: 8px; }
     .detail-actions, .form-actions { flex-wrap: wrap; gap: 1.2rem; }
 }
+
+/* Live feedback is opt-in: ordinary forms still work before JS connects. */
+.live-feedback p { display: none; color: var(--muted); font-size: .85rem; margin-top: 1rem; }
+[data-bookmarks-client][data-esw-state="connecting"] .live-connecting,
+[data-bookmarks-client][data-esw-state="connected"][aria-busy="true"] .live-saving,
+[data-bookmarks-client][data-esw-state="disconnected"] .live-offline,
+[data-bookmarks-client][data-esw-state="retrying"] .live-offline,
+[data-bookmarks-client][data-esw-state="resyncing"] .live-offline,
+[data-bookmarks-client][data-esw-state="expired"] .live-expired,
+[data-bookmarks-client][data-read-error] .live-error { display: block; }
+[data-bookmarks-client] .live-error { color: var(--error); }
+[data-bookmarks-client][aria-busy="true"] .read-toggle { opacity: .55; }

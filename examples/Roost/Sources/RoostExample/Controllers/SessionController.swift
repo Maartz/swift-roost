@@ -24,10 +24,12 @@ struct SessionController: Controller {
                 email: form.email, password: form.password) else {
             return try conn.render(LoginView(email: email, error: "Invalid email or password"), title: "Log in", status: .unprocessableContent)
         }
+        await RoostExample.readingQueue.invalidate(conn)
         return conn.loginUser(user, token: token).0.putFlash(.info, "Logged in").redirect(to: "/")
     }
 
     static func delete(_ conn: Connection) async throws -> Connection {
+        await RoostExample.readingQueue.invalidate(conn)
         if let token = conn.authSessionToken {
             try await AccountsContext(repo: conn.repo()).revoke(token: token)
         }

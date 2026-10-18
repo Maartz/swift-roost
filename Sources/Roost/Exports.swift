@@ -1,4 +1,6 @@
 @_exported import ESW
+@_exported import ESWLive
+@_exported import ServiceLifecycle
 @_exported import Foundation
 @_exported import HTTPTypes
 @_exported import Nexus

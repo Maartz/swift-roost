@@ -22,6 +22,7 @@ struct RegistrationController: Controller {
             let form = try conn.permit(Credentials.self)
             let (user, token) = try await AccountsContext(repo: conn.repo()).register(
                 email: form.email, password: form.password)
+            await RoostExample.readingQueue.invalidate(conn)
             return conn.loginUser(user, token: token).0.putFlash(.info, "Account created").redirect(to: "/")
         } catch let errors as ValidationErrors {
             let message = errors.fieldErrors.sorted { $0.key < $1.key }.flatMap { $0.value }.joined(separator: ". ")

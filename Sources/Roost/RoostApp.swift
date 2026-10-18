@@ -45,6 +45,10 @@ public protocol RoostApp {
     /// `ROOST_STORE_URL` and falls back to memory.
     var store: StoreConfiguration { get }
 
+    /// Services such as live routes. They stop before the HTTP server drains its
+    /// connections, so open event streams cannot hold shutdown open.
+    var services: [any Service] { get }
+
     /// Shared layout applied by `conn.render`. Default: render the view alone.
     var layout: HTMLLayout? { get }
 
@@ -113,6 +117,8 @@ extension RoostApp {
     public var sessionStore: SessionStore? { nil }
 
     public var store: StoreConfiguration { .environment }
+
+    public var services: [any Service] { [] }
 
     public var layout: HTMLLayout? { nil }
 
@@ -207,7 +213,12 @@ extension RoostApp {
         )
 
         do {
-            try await server.runService()
+            let group = ServiceGroup(configuration: .init(
+                services: [server] + app.services,
+                gracefulShutdownSignals: [.sigterm, .sigint],
+                logger: server.logger
+            ))
+            try await group.run()
         } catch {
             await spectro?.shutdown()
             throw error
