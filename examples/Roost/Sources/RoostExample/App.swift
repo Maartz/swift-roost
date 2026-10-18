@@ -15,7 +15,7 @@ struct RoostExample: RoostApp {
         }
     }
 
-    let sessionStore: (any SessionStore)? = MemorySessionStore()
+    let sessionStore: (any SessionStore)? = KeyValueSessionStore()
 
     var layout: HTMLLayout? {
         { conn, title, content in LayoutView(conn: conn, title: title, content: content).render() }

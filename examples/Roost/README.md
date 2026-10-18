@@ -59,9 +59,11 @@ DB_USER=postgres DB_PASSWORD=postgres ROOST_PORT=4001 ./dev
 ```
 
 Set `ROOST_DEMO=0` to skip sample data. Demo seeding only runs in the development
-environment and leaves an existing demo account alone. Sessions live in memory,
-so a server restart requires logging in again. The helpers only connect to local
-PostgreSQL; deployment configuration is outside their scope.
+environment and leaves an existing demo account alone. Sessions live in the
+app's key-value store, which is in memory here, so a server restart requires
+logging in again. To keep them, enable Roost's `Valkey` trait in `Package.swift`
+and set `ROOST_STORE_URL=valkey://localhost:6379`. The helpers only connect to
+local PostgreSQL; deployment configuration is outside their scope.
 
 ## A five-minute tour
 

@@ -76,6 +76,13 @@ public struct TestApp<App: RoostApp>: Sendable {
     /// Socket assigns injected into every `ChannelSocket` created via `connectSocket`.
     public let socketAssigns: SocketAssigns
 
+    /// The key-value store behind `conn.store`, for setting up or checking values.
+    ///
+    /// It's a fresh `MemoryKeyValueStore` for each test app unless the
+    /// initializer receives one, whatever `RoostApp.store` says, so
+    /// tests don't share state or need a server.
+    public let store: any KeyValueStore
+
     /// The in-memory job queue for this test app.
     /// Use `app.jobs.pending(_:)`, `app.jobs.discarded(_:)`, and `app.jobs.failedAttempts(_:)` to inspect state.
     public let jobs: InMemoryJobQueue
@@ -93,7 +100,8 @@ public struct TestApp<App: RoostApp>: Sendable {
     ///   - assigns: Socket assigns to inject into every socket created via `connectSocket(_:)`.
     ///   - runJobsInline: When `true` (default), jobs execute synchronously inside `push()`. Set to `false` to inspect the queue without executing.
     ///   - repository: A caller-owned repository, usually from `withTestRollback`. Skips creating a database client.
-    public init(_ type: App.Type, database: Database?? = nil, assigns: SocketAssigns = [:], runJobsInline: Bool = true, repository: (any Repo)? = nil) async throws {
+    ///   - store: The store behind `conn.store`. Defaults to a new `MemoryKeyValueStore`.
+    public init(_ type: App.Type, database: Database?? = nil, assigns: SocketAssigns = [:], runJobsInline: Bool = true, repository: (any Repo)? = nil, store: (any KeyValueStore)? = nil) async throws {
         let app = Roost.$environmentOverride.withValue(.test) {
             let app = App()
             app.configure(for: .test)
@@ -138,9 +146,11 @@ public struct TestApp<App: RoostApp>: Sendable {
             }
         }
 
+        let store = store ?? MemoryKeyValueStore()
+        self.store = store
         self.ownedClient = spectro
         self.plug = Roost.$environmentOverride.withValue(.test) {
-            roost_applicationPipeline(app, spectro: spectro, repository: repository,
+            roost_applicationPipeline(app, spectro: spectro, repository: repository, store: store,
                 channels: registry, jobs: jobQueue, pubSub: pubSubAdapter)
         }
     }

@@ -28,7 +28,8 @@ does not run that check or establish production readiness.
 
 | Area | Current boundary |
 | --- | --- |
-| Sessions | Memory store works within one process; persistent or shared storage needs another implementation. |
+| Key-value store | Memory and Valkey stores work; Valkey needs the `Valkey` trait. Hummingbird persist drivers can back it, without atomic counters. |
+| Sessions | `KeyValueSessionStore` persists sessions in the key-value store; `MemorySessionStore` works within one process. |
 | PubSub | In-memory implementation is available; the Valkey adapter is unfinished. |
 | Jobs | In-memory queue is available; the PostgreSQL store is a stub. |
 | Mail | Logger and test deliveries are available; SMTP delivery is a stub. |

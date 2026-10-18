@@ -22,6 +22,7 @@ without mutating global process variables.
 | `DB_USER` | Default `postgres`. Set your actual database role. |
 | `DB_PASSWORD` | Default `postgres`. Set your actual database password. |
 | `DB_NAME` | Explicit database name; bypasses environment suffixes. |
+| `ROOST_STORE_URL` | The key-value store, such as `valkey://cache.internal:6379`. Unset, the store is in memory. Needs the `Valkey` trait; see <doc:KeyValueStores>. |
 
 Explicit host, port, username, and password arguments to
 `Database.postgres(...)` take precedence over the corresponding variables.
@@ -79,8 +80,10 @@ TLS and HTTP/2 fields are configuration data; bootstrap does not apply them to
 Hummingbird. Use a separately configured HTTPS terminator for a deployed app
 until that integration is implemented.
 
-The default memory session store does not survive restarts or span replicas.
-Supply a suitable ``SessionStore`` before relying on persistent sessions.
+The memory session store does not survive restarts or span replicas. Use
+``KeyValueSessionStore`` with a Valkey `ROOST_STORE_URL` before relying on
+persistent sessions. In production, an app whose key-value store fell back to
+memory logs a warning the first time it uses it.
 Likewise, inspect the implementation status of channels, jobs, mail, and
 PubSub in <doc:ProjectStatus> before depending on an external adapter.
 

@@ -24,6 +24,7 @@ for the current implementation boundaries.
 - <doc:RoutingAndMiddleware>
 - <doc:ViewsAndForms>
 - <doc:DataAndMigrations>
+- <doc:KeyValueStores>
 - <doc:AuthenticationAndSessions>
 - <doc:CLIAndGenerators>
 
@@ -70,6 +71,15 @@ for the current implementation boundaries.
 - ``Changes``
 - ``Permitted``
 - ``ScopedRepo``
+
+### Key-value stores
+
+- ``KeyValueStore``
+- ``StoreKey``
+- ``StoreConfiguration``
+- ``MemoryKeyValueStore``
+- ``KeyValueSessionStore``
+- ``KeyValueStoreError``
 
 ### Identity and sessions
 

@@ -1,5 +1,68 @@
 # Changelog
 
+## 2.3.0 (unreleased)
+
+Apps have a key-value store, `conn.store`, kept in memory during development
+and on Valkey in production. One environment variable chooses between them.
+
+- `conn.store` reads and writes typed values through `StoreKey`s, each with
+  its own expiry: `get`, `set`, `remove`, `fetch` for caching, and an atomic
+  `increment` for counters.
+- `RoostApp.store` defaults to `.environment`. `ROOST_STORE_URL=valkey://…`
+  selects a Valkey or Redis server; without it the store is in memory, and in
+  production it logs a warning the first time it's used. `.memory`,
+  `.valkey(url:)`, `.persist(_:)` for a Hummingbird `PersistDriver`, and
+  `.custom(_:)` choose in code. Keys are prefixed with the app and
+  environment, such as `ReadingRoom:prod:`; `.namespaced(_:)` changes that.
+- The `Valkey` trait adds valkey-swift, the only new package an app
+  downloads; without the trait, nothing is fetched. Roost connects when the
+  server starts and closes the connections after it stops accepting requests.
+  While Valkey is unreachable or stops answering, requests that use the store
+  fail within a few seconds, then at once, and recover when it's back. Redis
+  works from 6.2.
+  Error messages hide the URL's credentials, also in a URL that can't be
+  parsed.
+- `conn.store` throws for a connection that has no store, such as one a
+  plug's unit test builds, instead of stopping the process.
+- `KeyValueSessionStore()` keeps sessions in the store, whether it's the
+  app's `sessionStore` or installed with `session(store:cookieName:ttl:)`.
+  Its values must be strings, numbers, booleans, or arrays and dictionaries of
+  those. Each session is stored under a hash of its ID, the cookie's value, so
+  listing the store's keys doesn't reveal sessions to sign in with.
+- `MemoryKeyValueStore` encodes, expires, and increments values the way Valkey
+  does. `TestApp` gives each test app a fresh one, readable as `app.store`,
+  or takes one with `store:`.
+- `rateLimit(max:windowSeconds:)` counts requests in `conn.store`, so with
+  Valkey a limit applies to the whole app instead of each instance. Its
+  window slides, instead of starting at each client's first request, so a
+  client can't send twice the limit around the end of a window. If the store
+  fails, requests are allowed and the error is logged at most once a minute;
+  a store without atomic counters falls back to each process's memory, and
+  isn't asked again. Counters are named by a hash of the client, so an API key
+  read with `by: .header(_:)` isn't stored in the clear.
+- The JSON body of a 429 escapes the message, so a message with quotes is
+  valid JSON.
+- `rateLimit(by: .ip)` uses the socket address when a request has neither
+  `X-Forwarded-For` nor `X-Real-IP`. Before, such requests weren't limited.
+
+### Upgrade
+
+Nothing changes until an app uses `conn.store` or `KeyValueSessionStore`;
+without `ROOST_STORE_URL`, rate limits count in each process's memory, as
+before, and don't log the production memory warning. To
+keep sessions across restarts and servers, enable the `Valkey` trait, set
+`ROOST_STORE_URL`, and replace `MemorySessionStore()` with
+`KeyValueSessionStore()`. On macOS, the Valkey client needs macOS 15 or later.
+
+Rate limits change in two ways:
+
+- Limits created at the same place in the code with the same `max` and
+  window share counters, such as two limits made by one helper function for
+  different routes. Before, each plug counted on its own. Pass `name:` to keep
+  them apart.
+- An app that receives requests directly, without a proxy, is now limited
+  by each client's socket address.
+
 ## Unreleased
 
 Your own errors can choose their response, and code outside a controller can
