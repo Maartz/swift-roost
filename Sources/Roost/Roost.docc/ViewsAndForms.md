@@ -130,6 +130,54 @@ the submitted values, field errors, and status `.unprocessableContent` (422).
 Its context validates the input as well, so JSON and HTML callers follow the
 same rules.
 
+### Render fields without repeating their plumbing
+
+``Input`` and ``Textarea`` render a label, the control, an optional hint, and
+validation errors. Use ``FormValues`` to keep submitted text and errors together:
+
+```html
+<% let form = FormValues(values, errors: errors) %>
+<.form action="/bookmarks" method="post">
+  <.input field={form["title"]} label="Title" required={true} maxLength={160} />
+  <.input field={form["url"]} label="Link" type="url" />
+  <.textarea field={form["note"]} label="Note" hint="Something to remember" />
+  <.input field={form["read"]} label="Already read" type="checkbox" />
+  <button type="submit">Save</button>
+</.form>
+```
+
+The field's raw value is escaped, including after a failed submission. Password
+inputs are always empty. A checkbox submits `true` when checked and is omitted
+when unchecked, as ``FormValues`` expects; no duplicate hidden value is added.
+Labels, hints, and error messages are plain text, not raw HTML.
+
+Each control has an ID derived from its name, a matching label, and
+`aria-invalid`. `aria-describedby` references only hints and errors actually
+present. Supply `id="edit-title"` when the same field appears more than once
+on a page; the label, hint, and error IDs follow that override. Error messages
+are rendered as supplied, without automatically prefixing the label.
+
+For defaults or metadata, construct a ``FormInput`` directly. Libraries can
+conform their own field type to ``FormFieldRepresentable``: the components then
+take the input type, required flag, length constraints, value, and errors from
+that field. Named component arguments override presentation defaults. Sensitive
+fields stay empty even when a component requests another input type.
+
+These components supply HTML, without CSS or JavaScript dependencies. Style
+ordinary elements, `.field-hint`, `.field-errors`, and `.field-error` in your app.
+`class` styles the control; `labelClass` styles its label. `attributes` adds
+HTML attributes such as `autocomplete`, `disabled`, or `data-*`; its names are
+validated and values escaped. `aria-describedby` is merged with the generated
+references. Reserved control attributes use the named arguments instead.
+As with `<.form>`, inline event-handler attribute values are trusted application
+code, never visitor input.
+
+Use native HTML for other controls or define an application component to choose
+your own markup. For example, an app-local `Input: ESWComponent` can replace the
+default `<.input>` while continuing to accept ``FormFieldRepresentable``.
+``FormValues/errors`` also retains model-level errors for a form-wide notice;
+field components display only the errors associated with their field.
+
 ### Use an inline fragment
 
 For a small response that does not contain a request-aware form, an inline

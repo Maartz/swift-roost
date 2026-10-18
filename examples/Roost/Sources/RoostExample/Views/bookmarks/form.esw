@@ -1,13 +1,8 @@
+<% let form = FormValues(values, errors: errors) %>
 <.form action={action} method={method} class="editor-form" attributes={["novalidate": ""]}>
-    <label for="title">Title</label>
-    <input id="title" name="title" value="<%= values["title"] ?? "" %>" placeholder="Something worth reading" maxlength="160" required aria-describedby="title-errors" aria-invalid="<%= errors["title"].isEmpty ? "false" : "true" %>">
-    <div id="title-errors"><% for error in errors["title"] { %><p class="field-error" role="alert">Title <%= error %></p><% } %></div>
-    <label for="url">Link</label>
-    <input id="url" type="url" name="url" value="<%= values["url"] ?? "" %>" placeholder="https://" required aria-describedby="url-errors" aria-invalid="<%= errors["url"].isEmpty ? "false" : "true" %>">
-    <div id="url-errors"><% for error in errors["url"] { %><p class="field-error" role="alert"><%= error %></p><% } %></div>
-    <label for="note">A note for later <span class="optional">optional</span></label>
-    <textarea id="note" name="note" rows="4" maxlength="2000" placeholder="Why did this catch your eye?" aria-describedby="note-errors"><%= values["note"] ?? "" %></textarea>
-    <div id="note-errors"><% for error in errors["note"] { %><p class="field-error" role="alert"><%= error %></p><% } %></div>
-    <label class="checkbox-label"><input type="checkbox" name="read" value="true" <%= ["true", "on", "1"].contains(values["read"] ?? "") ? "checked" : "" %>> I've already read this</label>
+    <.input field={form["title"]} label="Title" placeholder="Something worth reading" required={true} maxLength={160} />
+    <.input field={form["url"]} label="Link" type="url" placeholder="https://" required={true} />
+    <.textarea field={form["note"]} label="A note for later (optional)" placeholder="Why did this catch your eye?" maxLength={2000} />
+    <.input field={form["read"]} label="I've already read this" type="checkbox" labelClass="checkbox-label" />
     <div class="form-actions"><button type="submit"><%= button %></button><a href="/bookmarks">Cancel</a></div>
 </.form>
