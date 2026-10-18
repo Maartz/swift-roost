@@ -81,12 +81,23 @@ input type, its normalization, an insert, and an update dictionary.
 - The example app uses all of the above. `BookmarksContext` holds a
   `ScopedRepo`, `ReaderScope` carries the reader's `UUID`, and
   `Bookmark.editable` lists the editable fields once.
+- `RoostApp.migrations` takes a `MigrationRegistry` of Swift migrations and
+  bundled SQL history, from Spectro's `SpectroMigrations`, which `import Roost`
+  now includes. `App migrate` and `roost migrate` then run it through Spectro's
+  migration command, and `App migrate plan` prints the SQL without a database.
+  `down` still rolls back one migration unless given `--step`, and
+  `down --all` rolls back every one. Apps without a registry keep running
+  `Sources/Migrations/`.
+- The example app bundles its generated SQL and adds three Swift migrations:
+  a `read_at` column the database keeps in step with `read`, an index that
+  matches the reading queue's query, and a check that links are http or https.
+  The details page shows when a link was finished.
 - `DriftDetector`'s documentation and output no longer name `roost
   db:schema:dump` or `roost db:drift`, which the CLI doesn't have.
 
 ### Upgrade
 
-Apps compile unchanged, with deprecation warnings for:
+Most apps compile unchanged, with deprecation warnings for:
 
 - `AuthAssign`. Read the state with `currentUser(_:)`, `authenticatedUserID`,
   `authContext`, and `currentScope(_:)`. Roost 3.0 removes the string keys.
@@ -111,6 +122,14 @@ scope rather than a concrete one:
 Roost now requires Spectro 2.3.1 or later. Spectro 2.3.0 joined `where`
 clauses without parentheses, so an `||` condition on `ScopedRepo.query()`
 could return another owner's records. `swift package update` picks it up.
+
+`import Roost` now includes SpectroMigrations, whose public names include
+`Migration`, `SQL`, `CreateTable`, `AlterTable`, `DropTable`, `CreateIndex`,
+`Reversible`, and `Irreversible`. A type the app declares in its own module
+takes precedence and needs no change. A file that imports Roost and another
+module, such as a package of the app's or a dependency, that declares one of
+these names reports "ambiguous use"; qualify the name with its module, such as
+`AppCore.Migration`.
 
 ## 2.1.3
 

@@ -271,8 +271,9 @@ browser tests, and migrations in more detail.
 Migration commands use **Spectro's migration manager**, through Roost's application
 configuration. SQL files live in `Sources/Migrations/`, with `-- migrate:up`
 and `-- migrate:down` sections. Spectro applies them transactionally and records
-their versions in `schema_migrations`. The reading-list example follows this
-same path.
+their versions in `schema_migrations`. An app can also declare a
+`MigrationRegistry` that adds Swift migrations to that SQL history; the
+reading-list example does.
 
 ## The stack
 
@@ -480,10 +481,15 @@ export DB_NAME=todo_app
 ```
 
 Run from the application directory, or package the executable alongside `Public/`
-and `Sources/Migrations/`. Starting the server does not apply migrations.
+and `Sources/Migrations/`. An app with a migration registry reads its SQL from
+its resource bundle instead: ship the `<Package>_<Target>.resources` directory
+(`.bundle` on macOS) from `.build/release` with the executable. Starting the
+server does not apply migrations.
 
 `roost gen dockerfile` generates a Swift 6.3.3 build stage and matching slim
-runtime, installs zlib, and includes public assets and migrations. Supply the
+runtime, installs zlib, and includes public assets and the SQL files in
+`Sources/Migrations/`, but not yet the resource bundle a migration registry
+needs. Supply the
 `DB_*` variables to the container. Generated Dockerfiles resolve published
 dependencies, including Roost 2.1.0; no framework source checkout is required
 in the container build context.

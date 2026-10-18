@@ -13,6 +13,27 @@ public protocol RoostApp {
     /// Database configuration. Return `nil` for apps without a database.
     var database: Database? { get }
 
+    /// The app's migration history, run by `App migrate`. Return `nil` to run the
+    /// SQL files in `Sources/Migrations/` instead.
+    ///
+    /// A registry lists Swift migrations and bundled SQL directories explicitly:
+    ///
+    /// ```swift
+    /// var migrations: MigrationRegistry? {
+    ///     MigrationRegistry {
+    ///         SQLMigrations(bundle: .module, directory: "SQL")
+    ///         AddReadAtToBookmarks()
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// Declare it optional, as above. A property of type `MigrationRegistry`,
+    /// without the `?`, doesn't implement this requirement: Swift accepts it
+    /// silently, and `App migrate` keeps running `Sources/Migrations/`.
+    ///
+    /// Default: `nil`.
+    var migrations: MigrationRegistry? { get }
+
     /// Session store for server-side sessions. Return `nil` for apps that
     /// don't need sessions.
     /// Default: `nil`. Override to use `MemorySessionStore()` or a custom store.
@@ -81,6 +102,8 @@ public protocol RoostApp {
 extension RoostApp {
     public var database: Database? { nil }
 
+    public var migrations: MigrationRegistry? { nil }
+
     public var sessionStore: SessionStore? { nil }
 
     public var layout: HTMLLayout? { nil }
@@ -118,7 +141,8 @@ extension RoostApp {
         app.configure(for: Roost.env)
 
         if CommandLine.arguments.dropFirst().first == "migrate" {
-            try await app.runMigrationCommand(Array(CommandLine.arguments.dropFirst(2)))
+            let status = try await app.runMigrationCommand(Array(CommandLine.arguments.dropFirst(2)))
+            if status != 0 { exit(status) }
             return
         }
 

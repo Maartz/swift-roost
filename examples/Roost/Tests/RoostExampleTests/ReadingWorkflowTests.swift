@@ -69,6 +69,7 @@ func readingWorkflow() async throws {
         #expect(finished.status == .seeOther)
         let changed = try await alice.get(apiPath)
         #expect(changed.json["read"] as? Bool == true)
+        #expect(changed.json["read_at"] != nil)
         #expect(changed.json["note"] as? String == "A note for later")
         #expect(try await !alice.get("/bookmarks").text.contains("Swift &lt;notes&gt;"))
         #expect(try await alice.get("/bookmarks?filter=finished").text.contains("Swift &lt;notes&gt;"))
@@ -92,7 +93,9 @@ func readingWorkflow() async throws {
             "_method": "PUT", "title": "Edited title", "url": "https://swift.org/documentation/", "note": "", "_csrf_token": token,
         ])
         #expect(edited.status == .seeOther)
-        #expect(try await alice.get(apiPath).json["read"] as? Bool == false)
+        let reopened = try await alice.get(apiPath).json
+        #expect(reopened["read"] as? Bool == false)
+        #expect(reopened["read_at"] == nil)
         let apiCreated = try await alice.request(method: .post, path: "/api/bookmarks", body: payload,
             headers: ["Content-Type": "application/json", "X-CSRF-Token": token])
         #expect(apiCreated.status == .created)
@@ -133,8 +136,17 @@ func contextRollback() async throws {
             let page = try await app.get("/bookmarks/\(bookmark.id)", session: ["_roost_auth_token": token])
             #expect(page.status == .ok)
             #expect(page.text.contains("Inside the transaction"))
+            #expect(bookmark.readAt == nil)
             try await context.setRead(id: bookmark.id, read: true)
-            #expect(try await context.getBookmark(id: bookmark.id).read)
+            let finished = try await context.getBookmark(id: bookmark.id)
+            #expect(finished.read)
+            #expect(finished.readAt != nil)
+            // Saving a finished link again keeps the time it was finished. `now()` is fixed
+            // within a transaction, so start from an earlier time to see a reset.
+            let earlier = Date(timeIntervalSince1970: 1_791_000_000)
+            _ = try await context.bookmarks.update(bookmark.id, Changes().setting(\.readAt, to: earlier))
+            _ = try await context.updateBookmark(id: bookmark.id, with: link("Renamed").setting(\.read, to: true))
+            #expect(try await context.getBookmark(id: bookmark.id).readAt == earlier)
 
             // Scoped writes are single statements, so they check the owner inside the transaction too.
             let stranger = BookmarksContext(repo: transaction, reader: ReaderScope(userID: UUID()))
@@ -143,6 +155,32 @@ func contextRollback() async throws {
             #expect(try await context.getBookmark(id: bookmark.id).read)
         }
         #expect(try await repo.query(User.self).where { $0.email == email }.first() == nil)
+    } catch {
+        await client.shutdown()
+        throw error
+    }
+    await client.shutdown()
+}
+
+@Test("The database refuses a link that isn't a web link, even without validation")
+func databaseRequiresWebLinks() async throws {
+    let config = Database.postgres(database: "roost")
+    let client = try SpectroClient(hostname: config.hostname, port: config.port,
+        username: config.username, password: config.password, database: config.database)
+    do {
+        try await withTestRollback(repository: client.repository()) { transaction in
+            var reader = User()
+            reader.email = "constraint-\(UUID())@example.test"
+            reader.hashedPassword = "unused by this test"
+            let user = try await transaction.insert(reader)
+            var bookmark = Bookmark()
+            bookmark.userId = user.id
+            bookmark.title = "Unchecked"
+            bookmark.url = "javascript:alert(1)"
+            bookmark.note = ""
+            // The failed statement ends the transaction, so it comes last.
+            await #expect(throws: (any Error).self) { try await transaction.insert(bookmark) }
+        }
     } catch {
         await client.shutdown()
         throw error

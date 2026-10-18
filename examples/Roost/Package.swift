@@ -32,6 +32,7 @@ let package = Package(
                 .product(name: "Roost", package: "swift-roost"),
                 .product(name: "ESW", package: "esw"),
             ],
+            resources: [.copy("Migrations/SQL")],
             plugins: [
                 .plugin(name: "ESWBuildPlugin", package: "esw"),
             ]

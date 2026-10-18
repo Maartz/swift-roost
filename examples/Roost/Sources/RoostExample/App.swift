@@ -4,6 +4,17 @@ import Roost
 struct RoostExample: RoostApp {
     let database: Database? = Database.postgres(database: "roost")
 
+    /// The generated SQL history, then the Swift migrations written since.
+    /// `RoostExample migrate plan` prints the SQL without a database.
+    var migrations: MigrationRegistry? {
+        MigrationRegistry {
+            SQLMigrations(bundle: .module, directory: "SQL")
+            TrackWhenLinksAreRead()
+            IndexReadingQueues()
+            RequireWebLinks()
+        }
+    }
+
     let sessionStore: (any SessionStore)? = MemorySessionStore()
 
     var layout: HTMLLayout? {

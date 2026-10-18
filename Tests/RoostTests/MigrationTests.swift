@@ -595,3 +595,99 @@ struct SeederTests {
         #expect(dir.appendingPathComponent("prod.sql").lastPathComponent == "prod.sql")
     }
 }
+
+// MARK: - Registry Tests
+
+private struct CreateNotes: Migration {
+    static let id = "1791700000_create_notes"
+
+    var change: MigrationPlan {
+        CreateTable("notes") { table in
+            table.column("id", .uuid).primaryKey().default(.sql("gen_random_uuid()"))
+            table.column("body", .text).notNull()
+        }
+    }
+}
+
+private struct EmptyMigration: Migration {
+    static let id = "1791700001_empty"
+
+    var change: MigrationPlan {
+        get {}
+    }
+}
+
+private struct RegistryApp: RoostApp {
+    var migrations: MigrationRegistry? { MigrationRegistry { CreateNotes() } }
+    @RouteBuilder var routes: [Route] { GET("/") { $0 } }
+}
+
+private struct InvalidRegistryApp: RoostApp {
+    var migrations: MigrationRegistry? { MigrationRegistry { EmptyMigration() } }
+    @RouteBuilder var routes: [Route] { GET("/") { $0 } }
+}
+
+@Suite("Migrations — Registry")
+struct MigrationRegistryCommandTests {
+
+    @Test("down without --step rolls back only the newest migration")
+    func downDefaultsToOneStep() throws {
+        #expect(try RegistryApp.registryArguments(["down"]) == ["down", "--step", "1"])
+        #expect(try RegistryApp.registryArguments(["down", "--database", "app"]) == ["down", "--database", "app", "--step", "1"])
+        #expect(try RegistryApp.registryArguments(["down", "--step", "3"]) == ["down", "--step", "3"])
+        #expect(try RegistryApp.registryArguments(["down", "--step=0"]) == ["down", "--step=0"])
+        #expect(try RegistryApp.registryArguments(["down", "--help"]) == ["down", "--help"])
+        #expect(try RegistryApp.registryArguments(["up"]) == ["up"])
+        #expect(try RegistryApp.registryArguments(["plan", "--direction", "down"]) == ["plan", "--direction", "down"])
+    }
+
+    @Test("down --all rolls back every migration, and can't be combined with --step")
+    func downAllRollsBackEverything() throws {
+        #expect(try RegistryApp.registryArguments(["down", "--all"]) == ["down"])
+        #expect(try RegistryApp.registryArguments(["down", "--all", "--database", "app"]) == ["down", "--database", "app"])
+        #expect(throws: (any Error).self) { try RegistryApp.registryArguments(["down", "--all", "--step", "2"]) }
+        #expect(throws: (any Error).self) { try RegistryApp.registryArguments(["down", "--step=2", "--all"]) }
+    }
+
+    @Test("Roost's note comes with every form of help Spectro prints")
+    func helpRequests() throws {
+        for arguments in [[], ["help"], ["--help"], ["down", "-h"], ["down", "-help"], ["status", "--help"]] {
+            #expect(RegistryApp.asksForHelp(arguments), "\(arguments)")
+        }
+        for arguments in [["up"], ["down"], ["down", "--step", "2"], ["plan", "--direction", "down"]] {
+            #expect(!RegistryApp.asksForHelp(arguments), "\(arguments)")
+        }
+        #expect(try RegistryApp.registryArguments(["down", "-help"]) == ["down", "-help"])
+    }
+
+    @Test("down --all --step is a usage error, before any database connection")
+    func downAllWithStepIsAUsageError() async throws {
+        #expect(try await RegistryApp().runMigrationCommand(["down", "--all", "--step", "2"]) == 64)
+    }
+
+    @Test("plan compiles the registry without a database")
+    func planRunsOffline() async throws {
+        #expect(RegistryApp().database == nil)
+        #expect(try await RegistryApp().runMigrationCommand(["plan"]) == 0)
+        #expect(try await RegistryApp().runMigrationCommand(["plan", "--direction", "down"]) == 0)
+    }
+
+    @Test("a database command without a configured database fails before connecting")
+    func statusNeedsDatabase() async throws {
+        #expect(try await RegistryApp().runMigrationCommand(["status"]) != 0)
+    }
+
+    @Test("an invalid registry fails planning")
+    func invalidRegistryFails() async throws {
+        #expect(try await InvalidRegistryApp().runMigrationCommand(["plan"]) != 0)
+    }
+
+    @Test("apps without a registry keep the SQL command's usage check")
+    func sqlCommandUsage() async {
+        await #expect(throws: (any Error).self) { try await MinimalMigrationApp().runMigrationCommand(["plan"]) }
+    }
+}
+
+private struct MinimalMigrationApp: RoostApp {
+    @RouteBuilder var routes: [Route] { GET("/") { $0 } }
+}

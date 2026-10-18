@@ -36,9 +36,10 @@ let package = Package(
     dependencies: [
         // `roost spectro` builds the app's own spectro command, which needs `CLI`. Roost's
         // `RichTerminal` trait passes Spectro's on; without it spectro prints plain text
-        // and Noora is not fetched.
+        // and Noora is not fetched. `Migrations` gives `App migrate` Spectro's migration
+        // command; it shares ArgumentParser with `CLI`.
         ecosystem("Spectro", from: "2.3.1", traits: [
-            "CLI",
+            "CLI", "Migrations",
             .trait(name: "RichTerminal", condition: .when(traits: ["RichTerminal"])),
         ]),
         // Roost doesn't use Nexus's Vapor adapter.
@@ -70,6 +71,7 @@ let package = Package(
             name: "Roost",
             dependencies: [
                 .product(name: "SpectroKit", package: "Spectro"),
+                .product(name: "SpectroMigrations", package: "Spectro"),
                 .product(name: "SpectroCommon", package: "Spectro"),
                 .product(name: "Nexus", package: "Nexus"),
                 .product(name: "NexusRouter", package: "Nexus"),

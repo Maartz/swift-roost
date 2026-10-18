@@ -101,6 +101,7 @@ Application-specific additions are deliberately visible:
 | [BookmarksContext.swift](Sources/RoostExample/Contexts/BookmarksContext.swift) | Trimmed input, complete web URL validation, optional notes, and `setRead`. |
 | [BookmarksRoutes.swift](Sources/RoostExample/Routes/BookmarksRoutes.swift) | Reading filters and the `POST /bookmarks/:id/read` action. |
 | [ReadingQueue.swift](Sources/RoostExample/ReadingQueue.swift) | Three filter values and displayable link domains. |
+| [Migrations](Sources/RoostExample/Migrations) | The generated SQL as bundled history, and three Swift migrations written since. |
 | [Views](Sources/RoostExample/Views) | The reading queue, shared editor form, details, and account pages. |
 | [app.css](Public/css/app.css) | Responsive styling, keyboard focus, and the reading-list identity. |
 | [local.py](scripts/local.py) | Local setup and disposable test databases. |
@@ -133,6 +134,45 @@ The API provides `GET` and `POST /api/bookmarks`, plus `GET`, `PUT`, and `DELETE
 `read`. Mutating requests use the login cookie and an `X-CSRF-Token` header;
 the token is present in the HTML forms. Validation returns JSON field errors
 with status 422. Client-supplied ownership fields are not part of the input type.
+
+## Evolve the schema
+
+The generators wrote SQL migrations. The app now bundles them unchanged in
+`Migrations/SQL` and lists them in `App.swift` with the Swift migrations
+written since:
+
+```swift
+var migrations: MigrationRegistry? {
+    MigrationRegistry {
+        SQLMigrations(bundle: .module, directory: "SQL")
+        TrackWhenLinksAreRead()
+        IndexReadingQueues()
+        RequireWebLinks()
+    }
+}
+```
+
+- [TrackWhenLinksAreRead](Sources/RoostExample/Migrations/TrackWhenLinksAreRead.swift)
+  adds `read_at` and backfills it inside `Reversible`, because `AlterTable`
+  can't drop a column. A trigger then keeps `read_at` in step with `read`, so
+  the read button, the edit form, and the JSON API agree. The details page
+  shows the date.
+- [IndexReadingQueues](Sources/RoostExample/Migrations/IndexReadingQueues.swift)
+  replaces the index on `user_id` with one on `(user_id, created_at)`, which
+  matches the queue's query.
+- [RequireWebLinks](Sources/RoostExample/Migrations/RequireWebLinks.swift)
+  makes the database refuse links that aren't http or https, even when the
+  context's validation is skipped.
+
+Preview the SQL without a database, in either direction:
+
+```sh
+swift run RoostExample migrate plan
+swift run RoostExample migrate plan --direction down
+```
+
+`./dev` and `./check` apply pending migrations as before, and so does
+`roost migrate up`. `roost migrate down` rolls back the newest one.
 
 ## Test it
 
