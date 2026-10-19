@@ -14,7 +14,7 @@ let eswPath = ProcessInfo.processInfo.environment["ROOST_ESW_PATH"]
     ?? ecosystem.map { "\($0)/esw" }
 let eswDependency: Package.Dependency = eswPath.map {
     .package(name: "esw", path: $0)
-} ?? .package(url: "https://github.com/roost-framework/ESW.git", from: "1.6.0")
+} ?? .package(url: "https://github.com/roost-framework/ESW.git", from: "1.7.0")
 
 let package = Package(
     name: "RoostExample",

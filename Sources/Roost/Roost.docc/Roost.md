@@ -101,6 +101,9 @@ for the current implementation boundaries.
 
 ### Streaming and application services
 
+- <doc:LivePages>
+- ``LivePage``
+- ``LiveRoute``
 - ``ServerSentEvent``
 - ``SSEBroadcaster``
 - ``RoostPubSub``

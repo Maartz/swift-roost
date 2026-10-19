@@ -3,8 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+  # Include stacked PRs so each layer is tested before its base merges.
   pull_request:
-    branches: [main]
   workflow_dispatch:
     inputs:
       published_framework:
@@ -114,6 +114,21 @@ jobs:
         run: '"$(swift build --show-bin-path)/RoostExample" migrate up'
       - name: Test the example
         run: swift test
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install browser test tools
+        run: |
+          npm ci --prefix BrowserTests
+          npx --prefix BrowserTests playwright install --with-deps chromium
+      - name: Test live bookmarks in a browser
+        run: npm test --prefix BrowserTests
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-bookmarks-browser
+          path: examples/Roost/BrowserTests/artifacts/
+          if-no-files-found: ignore
 
   generated-app:
     runs-on: ubuntu-24.04

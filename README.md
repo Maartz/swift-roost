@@ -383,6 +383,20 @@ Additional attributes can use `attributes={["novalidate": "", "data-kind": "edit
 Values are escaped; reserved structural attributes cannot be overridden by that map.
 ESW stays independent of HTTP; request context and this component belong to Roost.
 
+## Live pages (current checkout)
+
+`LivePage` receives the current Roost connection in its mount and event handlers,
+so interactive pages reuse the same authenticated scopes and contexts as controllers.
+`LiveRoute` connects ESWLive's initial HTML, SSE updates, and POST events, and
+runs with the application's services to close streams during shutdown.
+
+The reading-list example updates rows and counts without navigation, retains
+native form submissions without JavaScript, and exercises offline recovery,
+lost replies, ownership, and logout in its browser suite. The integration uses
+ESW 1.7.0 and is available in this checkout; live state remains process-local.
+See [Live pages](Sources/Roost/Roost.docc/LivePages.md) and the
+[example's instructions](examples/Roost/README.md#live-page-and-browser-regression-tests).
+
 ## Configuration
 
 Configuration is expressed in Swift through `RoostApp`. The generated app

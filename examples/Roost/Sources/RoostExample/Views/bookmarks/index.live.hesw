@@ -1,0 +1,40 @@
+<section class="page-heading">
+    <div><p class="eyebrow">Your own corner of the web</p><h1 id="queue-heading" tabindex="-1">The reading queue<span class="accent">.</span></h1><p class="lede">Good links, kept for when you have the headspace.</p></div>
+    <a class="button" href="/bookmarks/new"><span aria-hidden="true">＋</span> Save a link</a>
+</section>
+<nav class="filters" aria-label="Reading status">
+    <a :for={item in ReadingFilter.allCases} href={"/bookmarks?filter=\(item.rawValue)"} class={"filter \(filter == item ? "active" : "")"} aria-current={filter == item ? "page" : "false"}>{item.label}<span class="count" data-filter-count={item.rawValue}>{bookmarks.filter { item.includes($0) }.count}</span></a>
+</nav>
+
+<section :if={visible.isEmpty} class="empty-state">
+    <p class="empty-symbol" aria-hidden="true">↗</p>
+    <h2>{filter == .finished ? "Nothing finished just yet." : "Room for your next good find."}</h2>
+    <p>{filter == .finished ? "Mark a link as read and it will be waiting here." : "Save an article, a guide, or an idea you want to return to."}</p>
+    <a href="/bookmarks/new">Save your first link <span aria-hidden="true">→</span></a>
+</section>
+
+<ol :if={!visible.isEmpty} class="reading-list">
+    <li :for={bookmark in visible} :key={bookmark.id} id={"bookmark-\(bookmark.id)"} class={"reading-item \(bookmark.read ? "is-read" : "")"}>
+        <.form action={"/bookmarks/\(bookmark.id)/read"} method="post" id={"read-\(bookmark.id)"} class="read-action" attributes={["esw-submit": "read"]}>
+            <input type="hidden" name="id" value={bookmark.id}>
+            <input type="hidden" name="read" value={bookmark.read ? "false" : "true"}>
+            <input type="hidden" name="filter" value={filter.rawValue}>
+            <button class="read-toggle" type="submit" aria-label={(bookmark.read ? "Mark unread: " : "Mark as read: ") + bookmark.title}><span aria-hidden="true">{bookmark.read ? "✓" : ""}</span></button>
+        </.form>
+        <div class="reading-copy">
+            <p class="domain">{bookmark.domain}</p>
+            <h2><a href={bookmark.url} target="_blank" rel="noopener noreferrer">{bookmark.title}<span class="external" aria-hidden="true"> ↗</span><span class="sr-only"> (opens in a new tab)</span></a></h2>
+            <p :if={!bookmark.note.isEmpty} class="reading-note">{bookmark.note}</p>
+        </div>
+        <a class="item-details" href={"/bookmarks/\(bookmark.id)"}>Details <span aria-hidden="true">→</span><span class="sr-only"> for {bookmark.title}</span></a>
+    </li>
+</ol>
+<p :if={!visible.isEmpty} class="queue-hint">A circle, a click, one less thing to read.</p>
+
+<div class="live-feedback" aria-live="polite" aria-atomic="true">
+    <p class="live-connecting">Connecting…</p>
+    <p class="live-saving">Saving…</p>
+    <p class="live-offline">Connection interrupted. Pending changes will resume when you reconnect.</p>
+    <p class="live-expired">This page is no longer connected. <a href={"/bookmarks?filter=\(filter.rawValue)"}>Reload the queue</a>.</p>
+    <p class="live-error">The change could not be saved. Please try again.</p>
+</div>
