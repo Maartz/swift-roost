@@ -5,8 +5,17 @@ import Foundation
 /// from a partially decoded model. Checkboxes omitted by browsers decode to false.
 public struct FormValues: Sendable {
     public let values: [String: String]
+    public let errors: ValidationErrors
 
-    public init(_ values: [String: String]) { self.values = values }
+    public init(_ values: [String: String], errors: ValidationErrors = ValidationErrors()) {
+        self.values = values
+        self.errors = errors
+    }
+
+    /// The original text and errors, suitable for `<.input field={form["title"]} ... />`.
+    public subscript(_ name: String) -> FormInput {
+        FormInput(name: name, value: values[name] ?? "", errors: errors[name])
+    }
 
     public func decode<T: Decodable>(_ name: String, as type: T.Type = T.self) throws -> T {
         let raw = values[name]

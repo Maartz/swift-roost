@@ -12,7 +12,7 @@ enum HTMLLayoutKey: AssignKey {
 }
 
 public enum ViewRenderingError: Error, Sendable, CustomStringConvertible {
-    case missingCSRFContext, invalidFormAction, invalidFormMethod, invalidFormAttribute
+    case missingCSRFContext, invalidFormAction, invalidFormMethod, invalidFormAttribute, invalidFieldAttribute
 
     public var description: String {
         switch self {
@@ -20,6 +20,7 @@ public enum ViewRenderingError: Error, Sendable, CustomStringConvertible {
         case .invalidFormAction: "Form actions must be relative URLs or HTTP(S) URLs without whitespace, credentials, or backslashes."
         case .invalidFormMethod: "Form methods must be GET, POST, PUT, PATCH, or DELETE."
         case .invalidFormAttribute: "Invalid or reserved form attribute."
+        case .invalidFieldAttribute: "Invalid or reserved field attribute. Use the component's named arguments for field attributes."
         }
     }
 }

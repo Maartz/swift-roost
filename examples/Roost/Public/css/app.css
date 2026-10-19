@@ -21,7 +21,7 @@ button, .button { display: inline-flex; align-items: center; justify-content: ce
 button:hover, .button:hover { background: #1d4294; }
 input:not([type="checkbox"]):not([type="hidden"]), textarea { display: block; width: 100%; background: var(--surface); color: var(--ink); border: 1px solid #aab8cc; border-radius: 6px; padding: .75rem .9rem; margin: .35rem 0 1.3rem; }
 input::placeholder, textarea::placeholder { color: #758298; }
-.editor-form input[aria-invalid="true"] { border-color: var(--error); }
+.editor-form input[aria-invalid="true"], .editor-form textarea[aria-invalid="true"] { border-color: var(--error); }
 textarea { resize: vertical; min-height: 120px; }
 label { display: block; font-size: .9rem; font-weight: 650; }
 small { display: block; color: var(--muted); }
@@ -76,6 +76,7 @@ p { margin: 0 0 1rem; }
 input[type="checkbox"] { accent-color: var(--blue); width: 18px; height: 18px; }
 .form-actions, .detail-actions { display: flex; align-items: center; gap: 1.8rem; margin-top: 2rem; }
 .field-error { color: var(--error); font-size: .88rem; margin-top: -.65rem; margin-bottom: 1.3rem; }
+.field-hint { color: var(--muted); font-size: .85rem; margin-top: -.65rem; }
 .flash { background: #e0eee8; color: #1c5341; border-left: 3px solid #43826c; padding: .85rem 1.1rem; margin-bottom: 30px; font-size: .9rem; }
 .flash.error { color: var(--error); background: #f8e6e6; border-color: var(--error); }
 .destination { overflow-wrap: anywhere; font-size: .9rem; }
