@@ -1,6 +1,27 @@
 # Changelog
 
-## 2.3.0 (unreleased)
+## 2.3.0 — 2026-10-19
+
+Live pages and reusable form fields join typed data operations, migration registries,
+and key-value stores in this release. This includes all changes since 2.1.3.
+
+- `Input` and `Textarea` render escaped values, constraints, labels, hints, and field
+  errors from `FormFieldRepresentable`; `FormValues["name"]` supplies ordinary form
+  fields. Sensitive values stay empty and controls have accessible error references.
+- `LivePage` supplies the current request to mount and event handlers. `LiveRoute`
+  serves initial HTML, SSE updates, local JavaScript, and CSRF-protected events,
+  binding each instance to its session and authentication identity.
+- `RoostApp.services` registers services that shut down before HTTP connections drain.
+  Register live routes here and invalidate their instances before login/logout changes
+  identity. Live state is process-local and expires; it is not shared by Valkey.
+- The bookmarks example updates rows and counts without navigation, with native
+  forms as a fallback. Browser regression tests cover offline recovery, lost replies,
+  focus, ownership, CSRF, logout, and graceful shutdown.
+- ESW's minimum version is now 1.7.0. Swift 6.3+, macOS 14+ or Linux remain supported;
+  the optional Valkey backend requires macOS 15+.
+- CSS changes refresh stylesheets during development without reloading the page.
+
+### Key-value stores
 
 Apps have a key-value store, `conn.store`, kept in memory during development
 and on Valkey in production. One environment variable chooses between them.
@@ -45,7 +66,7 @@ and on Valkey in production. One environment variable chooses between them.
 - `rateLimit(by: .ip)` uses the socket address when a request has neither
   `X-Forwarded-For` nor `X-Real-IP`. Before, such requests weren't limited.
 
-### Upgrade
+### Upgrade: key-value stores
 
 Nothing changes until an app uses `conn.store` or `KeyValueSessionStore`;
 without `ROOST_STORE_URL`, rate limits count in each process's memory, as
@@ -63,7 +84,7 @@ Rate limits change in two ways:
 - An app that receives requests directly, without a proxy, is now limited
   by each client's socket address.
 
-## Unreleased
+### Typed data, migrations, and request errors
 
 Your own errors can choose their response, and code outside a controller can
 read request bodies the way `conn.permit` does. Invalid input is a 422 wherever
@@ -158,7 +179,7 @@ input type, its normalization, an insert, and an update dictionary.
 - `DriftDetector`'s documentation and output no longer name `roost
   db:schema:dump` or `roost db:drift`, which the CLI doesn't have.
 
-### Upgrade
+### Upgrade: typed data and migrations
 
 Most apps compile unchanged, with deprecation warnings for:
 

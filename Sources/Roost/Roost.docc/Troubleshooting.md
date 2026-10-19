@@ -26,7 +26,7 @@ was not declared` means a deprecated string pipeline was used before its
 
 ### Templates collide or typed views are missing
 
-Require ESW 1.6.0 or later in the app's direct dependency and run
+Require ESW 1.7.0 or later in the app's direct dependency and run
 `swift package resolve`. Unset `ROOST_ESW_PATH` and `ROOST_ECOSYSTEM_PATH` if
 they select an older source checkout. File templates also require
 `ESWBuildPlugin` on the app target.

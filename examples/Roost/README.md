@@ -37,8 +37,8 @@ Your development data remains available for the next run.
 Prerequisites: Swift 6.3+, Python 3, a local PostgreSQL server, and `psql`,
 `createdb`, and `dropdb` on `PATH`. On Linux, Nexus also needs `zlib1g-dev`.
 
-The live frontend currently requires **this Roost checkout**, with **ESW from
-1.7.0**. Set `ROOST_FRAMEWORK_PATH=../..` as above until these APIs are released.
+The live frontend requires **Roost 2.3.0 or later**, with **ESW from 1.7.0**.
+Use `ROOST_FRAMEWORK_PATH=../..` to develop against the containing checkout.
 Companion packages still resolve from their published versions by default.
 
 The helper builds the CLI from the containing release checkout. The application

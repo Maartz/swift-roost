@@ -57,11 +57,12 @@ struct PageController: Controller {
 }
 ```
 
-**Roost 2.1.0** adds Phoenix-style controllers: routes name an action the
-compiler checks, `resources` routes REST actions, controller plugs run before
-chosen actions, `conn.permit` decodes only the fields an input type declares, and
-every request is logged and traced by action with secrets filtered. It uses
-published Nexus 2.x (from 2.1.0), Spectro 2.x (from 2.3.0), and ESW 1.6.0. Moving from
+**Roost 2.3.0** adds live pages, reusable form fields, typed writes, migration
+registries, and key-value stores. Routes name controller actions the compiler
+checks; `resources` builds REST routes and controller plugs run before chosen
+actions. `conn.permit` decodes only declared fields. Requests are logged and traced
+by action with secrets filtered. It uses
+published Nexus 2.x (from 2.1.0), Spectro 2.x (from 2.3.1), and ESW 1.7.0. Moving from
 Peregrine? Follow the [upgrade guide](guides/renaming-to-roost.md).
 [See what is implemented and what remains.](Sources/Roost/Roost.docc/ProjectStatus.md)
 
@@ -188,14 +189,14 @@ swift build -c release --product roost
 
 Then copy `.build/release/roost` to a directory on your `PATH`.
 
-Generated apps download Roost 2.1.3, Spectro 2.x (from 2.3.0), Nexus 2.x (from 2.1.0),
-and ESW 1.6.0 through SwiftPM. No companion source checkouts or dependency overrides are needed.
+Generated apps download Roost 2.3.0, Spectro 2.x (from 2.3.1), Nexus 2.x (from 2.1.0),
+and ESW 1.7.0 through SwiftPM. No companion source checkouts or dependency overrides are needed.
 Roost turns off Nexus's default `Vapor` trait, so SwiftPM skips Vapor and its dependencies.
 Generated apps enable Roost's `RichTerminal` trait, which gives `roost spectro` Spectro's
 colors, spinners, and styled tables:
 
 ```swift
-.package(url: "https://github.com/roost-framework/swift-roost", from: "2.1.3",
+.package(url: "https://github.com/roost-framework/swift-roost", from: "2.3.0",
          traits: [.defaults, "RichTerminal"])
 ```
 
@@ -383,7 +384,7 @@ Additional attributes can use `attributes={["novalidate": "", "data-kind": "edit
 Values are escaped; reserved structural attributes cannot be overridden by that map.
 ESW stays independent of HTTP; request context and this component belong to Roost.
 
-## Live pages (current checkout)
+## Live pages
 
 `LivePage` receives the current Roost connection in its mount and event handlers,
 so interactive pages reuse the same authenticated scopes and contexts as controllers.
@@ -393,7 +394,7 @@ runs with the application's services to close streams during shutdown.
 The reading-list example updates rows and counts without navigation, retains
 native form submissions without JavaScript, and exercises offline recovery,
 lost replies, ownership, and logout in its browser suite. The integration uses
-ESW 1.7.0 and is available in this checkout; live state remains process-local.
+ESW 1.7.0; live state remains process-local.
 See [Live pages](Sources/Roost/Roost.docc/LivePages.md) and the
 [example's instructions](examples/Roost/README.md#live-page-and-browser-regression-tests).
 
@@ -513,7 +514,7 @@ runtime, installs zlib, and includes public assets and the SQL files in
 `Sources/Migrations/`, but not yet the resource bundle a migration registry
 needs. Supply the
 `DB_*` variables to the container. Generated Dockerfiles resolve published
-dependencies, including Roost 2.1.0; no framework source checkout is required
+dependencies, including Roost 2.3.0; no framework source checkout is required
 in the container build context.
 
 ## Troubleshooting
@@ -521,7 +522,7 @@ in the container build context.
 - **The compiler cannot find `Roost`.** Require `swift-roost` 2.0.0 or later
   and use the `Roost` product. The 1.x tags contain the earlier Peregrine names.
   Unset stale dependency overrides and run `swift package resolve`.
-- **Templates collide or typed views are missing.** Require ESW 1.6.0 or later
+- **Templates collide or typed views are missing.** Require ESW 1.7.0 or later
   in the app's direct dependency, and run `swift package resolve`. Remove an
   outdated `ROOST_ESW_PATH` or `ROOST_ECOSYSTEM_PATH` override. File templates
   also need `ESWBuildPlugin` on the application target.
