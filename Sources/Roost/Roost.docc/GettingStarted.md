@@ -4,8 +4,8 @@ Generate a small app, run its first route, and test it without a database.
 
 ## Overview
 
-This guide uses Roost 2.1.3 with published ESW 1.6.0,
-Spectro 2.x (from 2.3.0), and Nexus 2.x (from 2.1.0). You need Swift 6.3 or later and macOS 14+ or a
+This guide uses Roost 2.3.0 with published ESW 1.7.0,
+Spectro 2.x (from 2.3.1), and Nexus 2.x (from 2.1.0). You need Swift 6.3 or later and macOS 14+ or a
 supported Linux environment. On Debian/Ubuntu, Nexus also needs `zlib1g-dev`
 at build time and `zlib1g` at runtime.
 

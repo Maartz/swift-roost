@@ -4,8 +4,7 @@ Distinguish the implemented application workflow from development integrations.
 
 ## Overview
 
-This catalog documents the current checkout, including the unreleased live-page
-integration. Releases before 2.0.0 use the earlier Peregrine module and executable names.
+This catalog documents Roost 2.3.0, including live pages and reusable form fields. Releases before 2.0.0 use the earlier Peregrine module and executable names.
 
 The core development path is a PostgreSQL-backed app with authentication,
 ownership-scoped resources, HTML and JSON responses, Spectro migrations,
@@ -41,7 +40,7 @@ Reference pages include these public declarations so you can inspect their
 contracts. Their presence in the navigator does not mean their external
 transport or storage adapter is complete.
 
-Roost 2.2 deprecates the stubs: `ValkeyPubSub` and `PubSub.valkey(url:)`,
+Roost 2.3 deprecates the stubs: `ValkeyPubSub` and `PubSub.valkey(url:)`,
 `JobQueue.postgres(spectro:)`, `PostgresJobStore`, `JobWorker`, `SMTPDelivery`,
 `channel(_:)`, and the TLS and HTTP/2 settings of ``ServerConfig``. Their
 deprecation warnings say what each one does instead. They remain through 2.x,
