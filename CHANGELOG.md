@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- `App db create|drop|seed|setup|reset` manages the database with the server's
+  configuration, like `mix ecto.create` and friends. `setup` creates the
+  database, runs pending migrations, and runs `Seeds/<env>.sql` when it exists;
+  `reset` drops the database first. `drop` and `reset` refuse `ROOST_ENV=prod`.
+  The `roost db` command in roost-cli runs them.
+- `App routes` lists each route's method and path in matching order, like
+  `mix phx.routes`. The `roost routes` command in roost-cli runs it.
+
 ## 2.3.0 — 2026-10-19
 
 Live pages and reusable form fields join typed data operations, migration registries,

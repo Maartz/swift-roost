@@ -258,11 +258,8 @@ export DB_PASSWORD=""
 export DB_HOST=localhost
 export DB_PORT=5432
 
-PGUSER="$DB_USER" PGPASSWORD="$DB_PASSWORD" PGHOST="$DB_HOST" PGPORT="$DB_PORT" createdb todo_app_dev
-PGUSER="$DB_USER" PGPASSWORD="$DB_PASSWORD" PGHOST="$DB_HOST" PGPORT="$DB_PORT" createdb todo_app_test
-
-roost migrate
-ROOST_ENV=test roost migrate
+roost db setup
+ROOST_ENV=test roost db setup
 swift test
 roost server --port 8080
 ```
@@ -437,6 +434,9 @@ Run `roost <command> --help` for options.
 | `roost gen resource Post title:string --model-only`           | Generate model, context, migration, and input tests.                            |
 | `roost gen migration add_post_index`                          | Create an empty SQL migration.                                                  |
 | `roost migrate up\|down\|status`                              | Apply, roll back, or inspect migrations using the app's database configuration. |
+| `roost db setup`                                              | Create the database, migrate it, and run `Seeds/<env>.sql` when it exists.      |
+| `roost db create\|drop\|seed\|reset`                          | Create, drop, or seed the database; `reset` drops it and runs `setup`.          |
+| `roost routes`                                                | List every route's method and path in matching order.                          |
 | `roost spectro database create my_app_dev`                    | Run any `spectro` command with the Spectro version in the app's `Package.resolved`. |
 | `roost server --port 8080`                                    | Build, serve, and watch for changes.                                            |
 | `roost build`                                                 | Build the app and configured CSS assets.                                        |

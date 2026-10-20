@@ -67,10 +67,8 @@ Configure the local database. For example, with Postgres.app's local user:
 ```sh
 export DB_USER="$USER"
 export DB_PASSWORD=""
-createdb todo_app_dev
-createdb todo_app_test
-roost migrate
-ROOST_ENV=test roost migrate
+roost db setup
+ROOST_ENV=test roost db setup
 swift test
 roost server --port 8080
 ```

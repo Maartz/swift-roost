@@ -154,10 +154,21 @@ extension RoostApp {
         let app = Self()
         app.configure(for: Roost.env)
 
-        if CommandLine.arguments.dropFirst().first == "migrate" {
-            let status = try await app.runMigrationCommand(Array(CommandLine.arguments.dropFirst(2)))
+        let arguments = Array(CommandLine.arguments.dropFirst(2))
+        switch CommandLine.arguments.dropFirst().first {
+        case "migrate":
+            let status = try await app.runMigrationCommand(arguments)
             if status != 0 { exit(status) }
             return
+        case "db":
+            let status = await app.runDatabaseCommand(arguments)
+            if status != 0 { exit(status) }
+            return
+        case "routes":
+            print(app.roost_routeTable)
+            return
+        default:
+            break
         }
 
         // A store configuration error stops the app before it opens the database.
@@ -224,5 +235,18 @@ extension RoostApp {
             throw error
         }
         await spectro?.shutdown()
+    }
+}
+
+// MARK: - Routes
+
+extension RoostApp {
+    /// What `App routes` prints, like `mix phx.routes`: each route's method and
+    /// path, one per line, in matching order.
+    package var roost_routeTable: String {
+        let routes = self.routes
+        let width = routes.map(\.method.rawValue.count).max() ?? 0
+        return routes.map { $0.method.rawValue.padding(toLength: width, withPad: " ", startingAt: 0) + "  " + $0.path }
+            .joined(separator: "\n")
     }
 }

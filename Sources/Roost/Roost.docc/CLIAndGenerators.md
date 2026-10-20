@@ -47,11 +47,8 @@ export DB_HOST=localhost
 export DB_PORT=5432
 unset DB_NAME
 
-PGUSER="$DB_USER" PGPASSWORD="$DB_PASSWORD" PGHOST="$DB_HOST" PGPORT="$DB_PORT" createdb reading_room_dev
-PGUSER="$DB_USER" PGPASSWORD="$DB_PASSWORD" PGHOST="$DB_HOST" PGPORT="$DB_PORT" createdb reading_room_test
-
-roost migrate up
-ROOST_ENV=test roost migrate up
+roost db setup
+ROOST_ENV=test roost db setup
 swift test
 roost server --port 8080
 ```
@@ -103,6 +100,9 @@ Its `./dev` and `./check` helpers own local setup and disposable test databases.
 | `gen resource Post title:string --model-only` | Model, context, migration, and input tests. |
 | `gen migration add_post_index` | Empty SQL migration to fill in. |
 | `migrate up / down / status` | App-configured migration operations. |
+| `db setup` | Create the database, migrate it, and run `Seeds/<env>.sql` when it exists. |
+| `db create / drop / seed / reset` | Create, drop, or seed the database; `reset` drops it and runs `setup`. |
+| `routes` | Every route's method and path, in matching order. |
 | `spectro database create my_app_dev` | Any `spectro` command, run with the app's resolved Spectro version. |
 | `server --port 8080` | Build, serve, and watch for edits. |
 | `build` | Build the app and its configured CSS assets. |
