@@ -19,7 +19,7 @@ Install the Roost CLI with [Mint](https://github.com/yonaskolb/Mint) and add
 
 ```sh
 brew install mint
-mint install roost-framework/roost-cli@2.1.1
+mint install roost-framework/roost-cli@2.2.0
 ```
 
 Without Mint, build from a checkout as described in the
@@ -62,18 +62,21 @@ the signed-in user's ID to the context. Actions decode input with
 For other scope types, generate `--model-only` and write the scope resolution for
 your domain explicitly.
 
-Configure the local database. For example, with Postgres.app's local user:
+Create the databases. `roost` runs the app's PostgreSQL in a container,
+`roost-todoapp-db`, with Apple's `container` or Docker, and prints its port the
+first time a command needs it: `[roost] Postgres: 127.0.0.1:<port>`.
 
 ```sh
-export DB_USER="$USER"
-export DB_PASSWORD=""
-createdb todo_app_dev
-createdb todo_app_test
+roost spectro database create todo_app_dev
+roost spectro database create todo_app_test
 roost migrate
 ROOST_ENV=test roost migrate
-swift test
-roost server --port 8080
+DB_HOST=127.0.0.1 DB_PORT=<port> swift test
+roost server
 ```
+
+To use a PostgreSQL server you run yourself, export `DB_HOST`, `DB_PORT`,
+`DB_USER`, and `DB_PASSWORD` first; `roost` then starts no container.
 
 Visit `/auth/register`, then `/todos`. Register a second user in another browser
 profile. Each user should see and modify only their own Todos. `/notes` is the

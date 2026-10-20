@@ -36,29 +36,30 @@ controllers decode input with `conn.permit`, so the input type is the list of
 fields a request can set. Authentication is generated
 first so the ownership foreign key can reference the users table.
 
-### Configure the local database
+### Create the databases
 
-For a local PostgreSQL role matching your shell user:
+`roost server`, `roost migrate`, and `roost spectro` run the app's PostgreSQL
+in a container, `roost-readingroom-db`, with Apple's `container` or Docker. The
+first of them starts it and prints `[roost] Postgres: 127.0.0.1:<port>`; the
+port stays the same for the app.
 
 ```sh
-export DB_USER="$USER"
-export DB_PASSWORD=""
-export DB_HOST=localhost
-export DB_PORT=5432
 unset DB_NAME
-
-PGUSER="$DB_USER" PGPASSWORD="$DB_PASSWORD" PGHOST="$DB_HOST" PGPORT="$DB_PORT" createdb reading_room_dev
-PGUSER="$DB_USER" PGPASSWORD="$DB_PASSWORD" PGHOST="$DB_HOST" PGPORT="$DB_PORT" createdb reading_room_test
+roost spectro database create reading_room_dev
+roost spectro database create reading_room_test
 
 roost migrate up
 ROOST_ENV=test roost migrate up
-swift test
-roost server --port 8080
+DB_HOST=127.0.0.1 DB_PORT=<port> swift test
+roost server
 ```
 
-Use your own local credentials if they differ. The `DB_NAME` override is unset
-here so development and tests select distinct databases from the generated
-base name.
+The `DB_NAME` override is unset here so development and tests select distinct
+databases from the generated base name. To use a PostgreSQL server you run
+yourself, export `DB_HOST`, `DB_PORT`, `DB_USER`, and `DB_PASSWORD`; `roost`
+then starts no container. On macOS, Apple's `container` publishes ports only
+after you allow `container-runtime-linux` in System Settings > Privacy &
+Security > Local Network.
 
 Register at `/auth/register`, then visit `/bookmarks`. The JSON resource is at
 `/api/bookmarks`. Its mutating requests use the session cookie and CSRF token.

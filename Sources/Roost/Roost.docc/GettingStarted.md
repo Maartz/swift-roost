@@ -18,7 +18,7 @@ Install the CLI with [Mint](https://github.com/yonaskolb/Mint):
 
 ```sh
 brew install mint
-mint install roost-framework/roost-cli@2.1.1
+mint install roost-framework/roost-cli@2.2.0
 roost --version
 ```
 
@@ -30,7 +30,7 @@ of Roost and its companion packages.
 Without Mint, for example on Linux, build from a checkout:
 
 ```sh
-git clone --branch 2.1.1 --depth 1 https://github.com/roost-framework/roost-cli.git
+git clone --branch 2.2.0 --depth 1 https://github.com/roost-framework/roost-cli.git
 cd roost-cli
 swift build -c release --product roost
 ```

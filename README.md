@@ -170,7 +170,7 @@ Install the CLI with [Mint](https://github.com/yonaskolb/Mint):
 
 ```sh
 brew install mint
-mint install roost-framework/roost-cli@2.1.1
+mint install roost-framework/roost-cli@2.2.0
 roost --version
 ```
 
@@ -182,7 +182,7 @@ not resolve the framework's dependencies.
 Without Mint, for example on Linux, build from a checkout:
 
 ```sh
-git clone --branch 2.1.1 --depth 1 https://github.com/roost-framework/roost-cli.git
+git clone --branch 2.2.0 --depth 1 https://github.com/roost-framework/roost-cli.git
 cd roost-cli
 swift build -c release --product roost
 ```
@@ -246,29 +246,31 @@ roost gen resource Todo title:string done:bool --both --scope user_id
 This creates HTML pages and a JSON API backed by one context. Ownership comes
 from the authenticated user; clients cannot choose another user's `user_id`.
 
-### 4. Configure PostgreSQL and run
+### 4. Create the databases and run
 
-The following example uses a local PostgreSQL role matching your macOS username,
-as with a typical Postgres.app installation. Set `DB_USER` and `DB_PASSWORD` to
-your own local credentials if they differ.
+`roost` runs the app's PostgreSQL 18 in a container of its own, with Apple's
+`container` when it is installed and Docker otherwise. The first command that
+needs it starts the container and prints its port:
+`[roost] Postgres: 127.0.0.1:<port>`. The port stays the same for the app.
 
 ```sh
-export DB_USER="$USER"
-export DB_PASSWORD=""
-export DB_HOST=localhost
-export DB_PORT=5432
-
-PGUSER="$DB_USER" PGPASSWORD="$DB_PASSWORD" PGHOST="$DB_HOST" PGPORT="$DB_PORT" createdb todo_app_dev
-PGUSER="$DB_USER" PGPASSWORD="$DB_PASSWORD" PGHOST="$DB_HOST" PGPORT="$DB_PORT" createdb todo_app_test
-
+roost spectro database create todo_app_dev
+roost spectro database create todo_app_test
 roost migrate
 ROOST_ENV=test roost migrate
-swift test
-roost server --port 8080
+DB_HOST=127.0.0.1 DB_PORT=<port> swift test
+roost server
 ```
 
+`roost` leaves the database alone when `DB_HOST` is set, so export `DB_HOST`,
+`DB_PORT`, `DB_USER`, and `DB_PASSWORD` to use a PostgreSQL server you run
+yourself. On macOS, allow `container-runtime-linux` in System Settings > Privacy
+& Security > Local Network, or the ports Apple's `container` publishes drop
+every connection.
+
 Open [localhost:8080/auth/register](http://localhost:8080/auth/register), create an
-account, then visit `/todos`. The JSON API lives at `/api/todos`. Mutating
+account, then visit `/todos`. When 8080 is taken, `roost server` prints the next
+free port it uses instead. The JSON API lives at `/api/todos`. Mutating
 cookie-authenticated JSON requests also require an `X-CSRF-Token` header.
 
 The development server watches Swift and template files. After a successful
