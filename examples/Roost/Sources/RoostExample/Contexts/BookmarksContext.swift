@@ -5,9 +5,12 @@ import Roost
 /// transaction repository.
 struct BookmarksContext: Sendable {
     let bookmarks: ScopedRepo<Bookmark, UUID>
+    /// The reader's open reading queues listen here, in every tab.
+    let topic: String
 
     init(repo: any Repo, reader: ReaderScope) {
         bookmarks = repo.scoped(\Bookmark.userId, to: reader.userID)
+        topic = "bookmarks:\(reader.userID)"
     }
 
     func listBookmarks() async throws -> [Bookmark] {
@@ -19,20 +22,32 @@ struct BookmarksContext: Sendable {
     }
 
     func createBookmark(_ changes: Changes<Bookmark>) async throws -> Bookmark {
-        try await bookmarks.insert(Bookmark.validate(changes))
+        let bookmark = try await bookmarks.insert(Bookmark.validate(changes))
+        changed()
+        return bookmark
     }
 
     func updateBookmark(id: UUID, with changes: Changes<Bookmark>) async throws -> Bookmark {
-        try await bookmarks.update(id, Bookmark.validate(changes))
+        let bookmark = try await bookmarks.update(id, Bookmark.validate(changes))
+        changed()
+        return bookmark
     }
 
     func deleteBookmark(id: UUID) async throws {
         try await bookmarks.delete(id)
+        changed()
     }
 
     /// A separate domain action keeps a reading-state change from replacing the saved link.
     func setRead(id: UUID, read: Bool) async throws {
         _ = try await bookmarks.update(id, Changes().setting(\.read, to: read))
+        changed()
+    }
+
+    /// Updates the reader's other open reading queues, as a Phoenix context
+    /// broadcasts after a write.
+    private func changed() {
+        RoostExample.readingQueue.broadcast(.changed, to: topic)
     }
 }
 

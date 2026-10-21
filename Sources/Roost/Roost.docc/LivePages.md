@@ -74,6 +74,52 @@ its state and sends a complete snapshot, without calling mount again.
 Session changes, redirects, and response headers belong in ordinary controller
 responses. Live handlers return new page state, not a modified connection.
 
+## Update open pages from the server
+
+A page can listen to topics and handle messages the server broadcasts to them,
+like a Phoenix LiveView subscribed to PubSub. Declare the message type as `Info`,
+the page's topics, and the state a message leads to:
+
+```swift
+struct BookmarksLive: LivePage {
+    enum Info: Sendable { case changed }
+
+    func topics(_ conn: Connection, context: LiveContext) throws -> [String] {
+        [try conn.bookmarks().topic]
+    }
+
+    func handleInfo(_ info: Info, state: State, conn: Connection) async throws -> State {
+        var next = state
+        next.bookmarks = try await conn.bookmarks().listBookmarks()
+        return next
+    }
+
+    // mount, handleEvent, and render as before
+}
+```
+
+Broadcast after a write, from a context, a controller, or another page's handler:
+
+```swift
+RoostExample.readingQueue.broadcast(.changed, to: "bookmarks:\(reader.userID)")
+```
+
+`topics` runs when the page is rendered, with that request. `handleInfo` receives
+the request of the page's open stream, with its repository and authenticated
+scope, and the page's new render streams to its browser. Messages are Swift
+values, never serialized. A browser can't send one: the event that carries a
+message is rejected when it comes from a browser.
+
+`broadcast` returns without waiting for the pages. The page whose handler
+broadcasts doesn't receive the message, because its handler already returns its
+new state. Each other page handles the message in turn with its own events. An
+event its browser sent before the new render arrived is rejected as stale: the
+client shows an error and resynchronizes, and the reader repeats the action.
+
+Delivery stays within this process and reaches only pages with an open stream.
+A disconnected page misses the message and keeps its previous state when it
+reconnects, because reconnection doesn't mount the page again.
+
 ## Templates and browser behavior
 
 A `.live.hesw` template returns `ESWLiveRender`. It supports typed views,
@@ -125,4 +171,4 @@ one hour and capacity of 1,000 instances per route. They don't survive a server
 restart. A multi-process deployment needs affinity for live requests; putting
 ordinary sessions in Valkey does not distribute live state. This integration
 uses ESW's protocol, with bounded queues and heartbeat writes, and does not
-implement Phoenix wire compatibility or cross-tab data synchronization.
+implement Phoenix wire compatibility. Broadcasts reach pages in the same process only.

@@ -149,6 +149,108 @@ struct LiveRouteTests {
         mutating func write(_ data: Data) async throws {}
     }
 
+    private struct ForwardingWriter: ResponseBodyWriter {
+        let packets: AsyncStream<String>.Continuation
+        mutating func write(_ data: Data) async throws { packets.yield(String(decoding: data, as: UTF8.self)) }
+    }
+
+    private final class RoomRoute: @unchecked Sendable {
+        var live: LiveRoute<Room>?
+    }
+
+    private struct Room: LivePage {
+        enum Info: Sendable { case said(String) }
+        var route = RoomRoute()
+        func mount(_ conn: Connection, context: LiveContext) async throws -> [String] { [] }
+        func handleEvent(_ event: LiveEvent, state: [String], conn: Connection) async throws -> [String] {
+            if event.name == "say", let text = event.value("text") { route.live?.broadcast(.said(text), to: "room:lobby") }
+            return state
+        }
+        func topics(_ conn: Connection, context: LiveContext) throws -> [String] {
+            ["room:\(context.parameters["room"] ?? "")"]
+        }
+        func handleInfo(_ info: Info, state: [String], conn: Connection) async throws -> [String] {
+            guard case .said(let text) = info else { return state }
+            return state + ["\(text) via \(conn.getReqHeader("X-Probe") ?? "no request")"]
+        }
+        func render(_ state: [String]) -> ESWLiveRender {
+            #live("<p>{state.joined(separator: \", \")}</p>")
+        }
+    }
+
+    /// Renders a lobby page and opens its stream, past the initial snapshot.
+    private func lobby(_ live: LiveRoute<Room>, probe: String) async throws
+        -> (page: Connection, packets: AsyncStream<String>.Iterator, streaming: Task<Void, any Error>) {
+        let page = try await live.render(request(), context: LiveContext(parameters: ["room": "lobby"]))
+        let stream = try await Router { live.routes }(request("/_live/\(try instance(page))/stream",
+                                                              session: page.session, headers: ["X-Probe": probe]))
+        guard case .producer(let produce) = stream.responseBody else { throw LiveError.notConnected }
+        let (packets, continuation) = AsyncStream<String>.makeStream()
+        let streaming = Task {
+            var writer: any ResponseBodyWriter = ForwardingWriter(packets: continuation)
+            try await produce(&writer)
+        }
+        var received = packets.makeAsyncIterator()
+        _ = await received.next() // The snapshot: the page now listens.
+        return (page, received, streaming)
+    }
+
+    private func next(_ packets: inout AsyncStream<String>.Iterator, containing text: String) async -> String {
+        var packet = ""
+        while !packet.contains(text), let next = await packets.next() { packet = next }
+        return packet
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func broadcastsUpdateOpenPagesOnTheTopicWithTheirStreamRequest() async throws {
+        let live = LiveRoute(Room())
+        var (_, packets, streaming) = try await lobby(live, probe: "stream")
+
+        live.broadcast(.said("ignored"), to: "room:kitchen")
+        live.broadcast(.said("hello"), to: "room:lobby")
+        let update = await next(&packets, containing: "hello")
+        #expect(update.contains("hello via stream"))
+        #expect(!update.contains("ignored"))
+
+        await live.shutdown()
+        try await streaming.value
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func aPageThatBroadcastsDoesNotReceiveItsOwnMessage() async throws {
+        let room = Room()
+        let live = LiveRoute(room)
+        room.route.live = live
+        var speaker = try await lobby(live, probe: "speaker")
+        var listener = try await lobby(live, probe: "listener")
+
+        let said = try await Router { live.routes }(request("/_live/\(try instance(speaker.page))/event", method: .post,
+            session: speaker.page.session,
+            headers: ["Content-Type": "application/json", "X-CSRF-Token": speaker.page.csrfToken],
+            body: try JSONEncoder().encode(LiveEvent(name: "say", values: ["text": ["hi"]], baseRevision: 1))))
+        #expect(said.response.status == .ok)
+        #expect(await next(&listener.packets, containing: "hi").contains("hi via listener"))
+        live.broadcast(.said("done"), to: "room:lobby")
+        #expect(!(await next(&speaker.packets, containing: "done")).contains("hi"))
+
+        await live.shutdown()
+        try await speaker.streaming.value
+        try await listener.streaming.value
+    }
+
+    @Test func browsersCannotSendServerMessages() async throws {
+        let live = LiveRoute(Room())
+        let router = Router { live.routes }
+        let page = try await live.render(request())
+        let id = try instance(page)
+        _ = try await router(request("/_live/\(id)/stream", session: page.session))
+        let forged = try await router(request("/_live/\(id)/event", method: .post, session: page.session,
+            headers: ["Content-Type": "application/json", "X-CSRF-Token": page.csrfToken],
+            body: try JSONEncoder().encode(LiveEvent(name: LiveRequest.infoEvent, baseRevision: 1))))
+        #expect(forged.response.status == .unprocessableContent)
+        await live.shutdown()
+    }
+
     @Test func malformedEventsAndFailuresDoNotExposeDiagnostics() async throws {
         let live = LiveRoute(Page(calls: Calls()))
         let router = Router { live.routes }

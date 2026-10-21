@@ -34,7 +34,7 @@ does not run that check or establish production readiness.
 | Mail | Logger and test deliveries are available; SMTP delivery is a stub. |
 | Channels | In-process registry and test helpers exist; the HTTP upgrade route is a stub. |
 | TLS / HTTP/2 | `ServerConfig(tls:)` serves HTTPS and negotiates HTTP/2, falling back to HTTP/1.1. HTTP/2 without TLS is rejected at startup. |
-| Live pages | `LivePage` and `LiveRoute` integrate ESWLive over SSE and POST, with session ownership, CSRF, reconnects, and shutdown. State is process-local; see <doc:LivePages>. |
+| Live pages | `LivePage` and `LiveRoute` integrate ESWLive over SSE and POST, with session ownership, CSRF, reconnects, and shutdown. `broadcast(_:to:)` updates other open pages. State and broadcasts are process-local; see <doc:LivePages>. |
 
 Reference pages include these public declarations so you can inspect their
 contracts. Their presence in the navigator does not mean their external

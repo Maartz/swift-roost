@@ -1,6 +1,9 @@
 import Roost
 
 struct BookmarksLive: LivePage {
+    /// A change made in another tab, or through the HTML or JSON controllers.
+    enum Info: Sendable { case changed }
+
     struct State: Sendable {
         let readerID: UUID
         let filter: ReadingFilter
@@ -26,6 +29,17 @@ struct BookmarksLive: LivePage {
         try await context.setRead(id: id, read: rawRead == "true")
         var next = state
         next.bookmarks = try await context.listBookmarks()
+        return next
+    }
+
+    func topics(_ conn: Connection, context: LiveContext) throws -> [String] {
+        [try conn.bookmarks().topic]
+    }
+
+    func handleInfo(_ info: Info, state: State, conn: Connection) async throws -> State {
+        guard try conn.requireScope(ReaderScope.self).userID == state.readerID else { throw LiveError.unauthorized }
+        var next = state
+        next.bookmarks = try await conn.bookmarks().listBookmarks()
         return next
     }
 

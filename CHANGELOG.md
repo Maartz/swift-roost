@@ -8,6 +8,14 @@
 - A missing certificate or key file, or HTTP/2 without TLS, stops the app at
   startup with `ServerConfigError`, before it opens the database.
   `ServerConfig(host:port:http2:)` stays deprecated: HTTP/2 needs TLS.
+- Live pages update from the server, like a LiveView's `handle_info`. A `LivePage`
+  names its `topics`, and `handleInfo(_:state:conn:)` turns a typed `Info` message
+  into new state, with the request of the page's open stream.
+  `LiveRoute.broadcast(_:to:)` sends a message to the open pages of a topic in this
+  process, skipping the page whose handler broadcasts. Existing pages compile
+  unchanged.
+- The bookmarks example broadcasts after every write, so a reader's other tabs
+  update without reloading.
 
 ## 2.4.0 — 2026-10-21
 

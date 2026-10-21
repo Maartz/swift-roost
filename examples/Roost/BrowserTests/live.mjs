@@ -133,6 +133,8 @@ try {
     await plain.waitForLoadState();
     await eventually(async () => Number(await plain.locator('[data-filter-count="finished"]').textContent()) === 1, 'Native POST fallback failed');
     await native.close();
+    // The open live page hears about the change without reloading.
+    await eventually(async () => await count('finished') === 1, 'Open page missed a change made elsewhere');
 
     await page.goto(url + '/bookmarks?filter=unread');
     await connected(page);
@@ -154,7 +156,7 @@ try {
     server.kill('SIGTERM');
     await eventually(() => exited, 'Open live streams blocked graceful shutdown', 8000);
     assert.equal((await serverExit).code, 0);
-    console.log('Live bookmarks: SSR, updates, keyed DOM, offline recovery, lost replies, errors, ownership, CSRF, native forms, logout, and graceful shutdown passed.');
+    console.log('Live bookmarks: SSR, updates, keyed DOM, offline recovery, lost replies, errors, ownership, CSRF, native forms, broadcasts, logout, and graceful shutdown passed.');
 } finally {
     await browser?.close();
     if (!exited) {

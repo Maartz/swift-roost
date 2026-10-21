@@ -238,8 +238,10 @@ still POST normally with JavaScript disabled.
 
 The client shows saving, offline, expired, and error states. Reconnection keeps
 pending event IDs, and removing the last visible row returns focus to the queue
-heading. Live state belongs to this server process; separate tabs don't receive
-each other's database changes automatically.
+heading. `BookmarksContext` broadcasts after every write, whether it comes from
+a live event, a form, or the JSON API, and `BookmarksLive.handleInfo` reloads the
+list, so the reader's other open tabs update without reloading. Live state and
+broadcasts belong to this server process.
 
 With an isolated PostgreSQL database configured by `DB_*`, run:
 
@@ -258,6 +260,6 @@ The browser suite starts the built app on a free loopback port, creates test
 accounts and bookmarks in that database, and stops its server afterward. On
 macOS it uses installed Google Chrome; elsewhere it uses Playwright Chromium.
 It checks live updates, DOM identity, offline recovery, lost acknowledgements,
-errors, ownership, CSRF, native form fallback, logout, focus, and graceful
+errors, ownership, CSRF, native form fallback, broadcasts, logout, focus, and graceful
 shutdown with an active stream. Screenshots and server output are written under
 `BrowserTests/artifacts/` (ignored by Git).
