@@ -42,7 +42,9 @@ public protocol Channel: Sendable {
     /// Events to intercept before fan-out. Override to return event names this handler intercepts.
     static var intercepts: [String] { get }
 
-    /// Called for each intercepted event. Mutate and return the payload, or throw `ChannelError.halt`.
+    /// Called for each intercepted event, once for each socket that receives
+    /// it, as Phoenix's `handle_out`. Return the payload `socket` receives, or
+    /// throw `ChannelError.halt` to skip it.
     func intercept(event: String, payload: ChannelPayload, socket: ChannelSocket) async throws -> ChannelPayload
 }
 

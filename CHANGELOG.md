@@ -52,6 +52,12 @@
   and `leaves` map each key to `{"metas": [...]}`, instead of to a name. A
   socket's presence ends when it leaves the topic or closes, with a
   `presence_diff`, so channels no longer need `Presence.untrack` in `leave`.
+- With `RoostApp.pubSub`, channel broadcasts go through it, including
+  `ChannelRegistry.broadcast`, so a `ValkeyPubSub` delivers them to the sockets
+  of every server. Presence stays with each server's own sockets.
+- A channel's `intercept` runs once for each socket that receives an event,
+  with that socket, as Phoenix's `handle_out`, and for server broadcasts too.
+  `ChannelError.halt` skips that socket instead of failing the broadcast.
 
 ### Upgrade
 
@@ -60,7 +66,8 @@ SwiftPM rejects a package that supports an older macOS than one of its
 dependencies.
 
 A test that reads a `presence_diff`'s `joins` or `leaves` as `[String: String]`
-reads each key's `["metas": [...]]` instead.
+reads each key's `["metas": [...]]` instead. A channel's `intercept` receives
+the socket an event goes to, instead of the sender's.
 
 ## 2.4.0 — 2026-10-21
 

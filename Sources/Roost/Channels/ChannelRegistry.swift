@@ -1,6 +1,10 @@
 import Foundation
+import Logging
 
 /// The shared hub that tracks live sockets per topic and fans out broadcasts.
+///
+/// With a PubSub, broadcasts reach the sockets of every server that shares it.
+/// Presence stays with each server's own sockets.
 ///
 /// Uses `@unchecked Sendable` with an `NSLock` so registration and unregistration
 /// are synchronous — allowing `TestChannelSocket.deinit` to clean up without `await`.
@@ -16,6 +20,10 @@ public final class ChannelRegistry: @unchecked Sendable {
     // MARK: - State
 
     public var router: ChannelRouter
+    private let pubSub: (any RoostPubSub)?
+    /// The PubSub topic that carries the app's channel broadcasts between servers.
+    private let pubSubTopic: String
+    private var subscription: SubscriptionToken?
     private let lock = NSLock()
     private var sockets: [String: [UUID: ChannelSocket]] = [:]
     /// topic → key → [PresenceMeta] — supports multiple metas per key (multi-tab)
@@ -23,8 +31,19 @@ public final class ChannelRegistry: @unchecked Sendable {
 
     // MARK: - Init
 
-    public init(router: ChannelRouter = ChannelRouter()) {
+    /// - Parameters:
+    ///   - router: The channels, by topic pattern.
+    ///   - pubSub: Carries broadcasts between servers. `main()` passes
+    ///     ``RoostApp/pubSub``. Without one, broadcasts reach this process only.
+    public init(router: ChannelRouter = ChannelRouter(), pubSub: (any RoostPubSub)? = nil) {
         self.router = router
+        self.pubSub = pubSub
+        self.pubSubTopic = "roost.channels:\(router.path)"
+        subscription = pubSub?.subscribe(pubSubTopic) { [weak self] message in await self?.receive(message) }
+    }
+
+    deinit {
+        if let subscription { pubSub?.unsubscribe(subscription) }
     }
 
     // MARK: - Registration (synchronous)
@@ -114,8 +133,8 @@ public final class ChannelRegistry: @unchecked Sendable {
 
     // MARK: - Broadcast (internal — from ChannelSocket)
 
-    /// Delivers an event to all sockets on `topic`, optionally excluding the sender.
-    /// Runs the channel's `intercept` hook if the event is registered for interception.
+    /// Delivers an event to all sockets on `topic`, through the PubSub when
+    /// there is one, optionally excluding the sender.
     func deliver(
         topic: String,
         event: String,
@@ -123,37 +142,61 @@ public final class ChannelRegistry: @unchecked Sendable {
         from sender: ChannelSocket,
         excludeSender: Bool
     ) async throws {
-        var deliveryPayload = payload
-
-        // Run intercept if the channel type wants to intercept this event
-        if let handlerType = router.handlerType(for: topic),
-           handlerType.intercepts.contains(event) {
-            let handler = handlerType.init()
-            deliveryPayload = try await handler.intercept(event: event, payload: payload, socket: sender)
-        }
-
-        let targets = lock.withLock {
-            sockets[topic].map { Array($0.values) } ?? []
-        }
-        for socket in targets {
-            if excludeSender && socket.id == sender.id { continue }
-            socket.deliverHandler(event, deliveryPayload)
-        }
+        try await publish(topic: topic, event: event, payload: payload, except: excludeSender ? sender.id : nil)
     }
 
     // MARK: - Broadcast (public — server push, no sender)
 
     /// Broadcasts an event to all sockets on `topic` from outside a handler (e.g. background job).
-    /// Does not run intercept hooks.
     ///
-    /// - Throws: `EncodingError` for a payload that JSON can't hold.
+    /// - Throws: `EncodingError` for a payload that JSON can't hold, or the
+    ///   PubSub's error.
     public func broadcast(topic: String, event: String, payload: ChannelPayload) async throws {
         _ = try JSONValue(payload)
-        let targets = lock.withLock {
-            sockets[topic].map { Array($0.values) } ?? []
+        try await publish(topic: topic, event: event, payload: payload, except: nil)
+    }
+
+    private func publish(topic: String, event: String, payload: ChannelPayload, except: UUID?) async throws {
+        guard let pubSub else {
+            return await deliverLocally(topic: topic, event: event, payload: payload, except: except)
         }
-        for socket in targets {
-            socket.deliverHandler(event, payload)
+        try await pubSub.broadcast(pubSubTopic, event: event, payload: [
+            "topic": topic, "payload": payload, "except": except?.uuidString,
+        ])
+    }
+
+    private func receive(_ message: PubSubMessage) async {
+        guard let topic = message.payload["topic"] as? String, let payload = message.payload["payload"] as? ChannelPayload
+        else {
+            return Logger(label: "roost.channels").error("Dropped a channel broadcast that isn't Roost's", metadata: [
+                "event": .string(message.event),
+            ])
+        }
+        let except = (message.payload["except"] as? String).flatMap(UUID.init(uuidString:))
+        await deliverLocally(topic: topic, event: message.event, payload: payload, except: except)
+    }
+
+    /// Delivers an event to this process's sockets on `topic`. Each socket
+    /// gets the payload the channel's `intercept` returns for it, when the
+    /// channel intercepts `event`.
+    func deliverLocally(topic: String, event: String, payload: ChannelPayload, except: UUID?) async {
+        let targets = lock.withLock { sockets[topic].map { Array($0.values) } ?? [] }
+        let handlerType = router.handlerType(for: topic).flatMap { $0.intercepts.contains(event) ? $0 : nil }
+        for socket in targets where socket.id != except {
+            guard let handlerType else {
+                socket.deliverHandler(event, payload)
+                continue
+            }
+            do {
+                socket.deliverHandler(event, try await handlerType.init().intercept(event: event, payload: payload,
+                                                                                    socket: socket))
+            } catch ChannelError.halt {
+                continue
+            } catch {
+                Logger(label: "roost.channels").error("Channel intercept failed", metadata: [
+                    "topic": .string(topic), "event": .string(event), "error": .string(String(describing: error)),
+                ])
+            }
         }
     }
 }

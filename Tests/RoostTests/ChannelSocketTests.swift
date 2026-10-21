@@ -23,6 +23,8 @@ private final class Departures: @unchecked Sendable {
 }
 
 private struct LobbyChannel: Channel {
+    static var intercepts: [String] { ["shout"] }
+
     func join(topic: String, payload: ChannelPayload, socket: ChannelSocket) async throws -> ChannelPayload {
         if topic == "room:locked" { throw ChannelError.unauthorized("locked") }
         return ["user": socket.assigns["user"] as? String ?? "", "greeting": socket.assigns["greeting"] as? String ?? ""]
@@ -32,6 +34,8 @@ private struct LobbyChannel: Channel {
         switch event {
         case "shout":
             try await socket.broadcast(event: "shout", payload: ["body": payload["body"] ?? "", "from": socket.assigns["user"] ?? ""])
+        case "whisper":
+            try await socket.broadcastFrom(event: "whisper", payload: ["body": payload["body"] ?? ""])
         case "ping":
             try await socket.push(event: "pong", payload: ["count": payload["count"] ?? 0])
         case "fail":
@@ -43,6 +47,11 @@ private struct LobbyChannel: Channel {
 
     func leave(topic: String, payload: ChannelPayload, socket: ChannelSocket) async {
         Departures.shared.record(socket.assigns["user"] as? String ?? "")
+    }
+
+    /// Names the socket that receives each shout.
+    func intercept(event: String, payload: ChannelPayload, socket: ChannelSocket) async throws -> ChannelPayload {
+        payload.merging(["to": socket.assigns["user"] ?? ""]) { _, new in new }
     }
 }
 
@@ -137,17 +146,26 @@ struct ChannelSocketTests {
         tls: ServerConfig.TLSConfig? = nil,
         _ body: @Sendable (any TestClientProtocol) async throws -> Void
     ) async throws {
+        try await serve(tls: tls, pubSub: nil) { client, _ in try await body(client) }
+    }
+
+    /// Serves `SocketApp`'s channels with `pubSub`, as `main()` does.
+    private func serve(
+        tls: ServerConfig.TLSConfig? = nil,
+        pubSub: (any RoostPubSub)?,
+        _ body: @Sendable (any TestClientProtocol, ChannelRegistry) async throws -> Void
+    ) async throws {
         let app = SocketApp()
+        let registry = ChannelRegistry(router: app.channels, pubSub: pubSub)
         let sockets = try #require(roost_channelSockets(
-            app, spectro: nil, store: MemoryKeyValueStore(), channels: ChannelRegistry(router: app.channels),
-            jobs: nil, pubSub: nil))
+            app, spectro: nil, store: MemoryKeyValueStore(), channels: registry, jobs: nil, pubSub: pubSub))
         let config = ServerConfig(host: "127.0.0.1", port: 0, tls: tls)
         let server = Application(
             responder: NexusHummingbirdAdapter(plug: { conn in conn.text("ok") }),
             server: try config.serverBuilder(channels: sockets),
             configuration: .init(address: .hostname(config.host, port: config.port))
         )
-        try await server.test(.live) { client in try await body(client) }
+        try await server.test(.live) { client in try await body(client, registry) }
     }
 
     @Test func joiningATopicRepliesWithTheChannelsPayload() async throws {
@@ -203,7 +221,7 @@ struct ChannelSocketTests {
                     #expect(shout.payload["body"] as? String == "hi" && shout.payload["from"] as? String == "ada")
                 }
                 let echo = try await ada.receive()
-                #expect(echo.event == "shout")
+                #expect(echo.event == "shout" && echo.payload["to"] as? String == "ada")
                 let reply = try await ada.receive()
                 #expect(reply.ref == "2" && reply.event == "phx_reply" && reply.status == "ok")
             }
@@ -265,6 +283,40 @@ struct ChannelSocketTests {
                 _ = try await phoenix.join("room:lobby", ref: "1")
             }
             try await Departures.shared.wait(for: user)
+        }
+    }
+
+    @Test func broadcastsReachTheSocketsOfEveryServer() async throws {
+        let pubSub = PubSub.inMemory()
+        try await serve(pubSub: pubSub) { first, firstRegistry in
+            try await serve(pubSub: pubSub) { second, _ in
+                try await first.ws("/socket/websocket?user=ada") { inbound, outbound, _ in
+                    var ada = PhoenixClient(inbound, outbound)
+                    _ = try await ada.join("room:lobby", ref: "1")
+                    try await second.ws("/socket/websocket?user=bob") { inbound, bobOutbound, _ in
+                        var bob = PhoenixClient(inbound, bobOutbound)
+                        _ = try await bob.join("room:lobby", ref: "10")
+
+                        try await PhoenixClient.send(on: outbound, "1", "2", "room:lobby", "shout", ["body": "hi"])
+                        let shout = try await bob.receive()
+                        #expect(shout.event == "shout" && shout.payload["body"] as? String == "hi")
+                        // Each server runs the channel's intercept for its own sockets.
+                        #expect(shout.payload["to"] as? String == "bob")
+
+                        try await PhoenixClient.send(on: outbound, "1", "3", "room:lobby", "whisper", ["body": "psst"])
+                        let whisper = try await bob.receive()
+                        #expect(whisper.event == "whisper" && whisper.payload["body"] as? String == "psst")
+
+                        try await firstRegistry.broadcast(topic: "room:lobby", event: "notice", payload: ["body": "hello"])
+                        let notice = try await bob.receive()
+                        #expect(notice.event == "notice" && notice.payload["to"] == nil)
+                    }
+                    var events: [String] = []
+                    for _ in 0..<4 { events.append(try await ada.receive().event) }
+                    // Ada's own shout and the server's notice, but not her whisper.
+                    #expect(events.sorted() == ["notice", "phx_reply", "phx_reply", "shout"])
+                }
+            }
         }
     }
 

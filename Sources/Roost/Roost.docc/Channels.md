@@ -89,6 +89,24 @@ reason `internal error`, and are logged.
 When a client leaves a topic, or its socket closes, Roost calls
 ``Channel/leave(topic:payload:socket:)``.
 
+## Broadcast
+
+``ChannelSocket/broadcast(event:payload:)`` sends an event to every socket of
+the topic, and ``ChannelSocket/broadcastFrom(event:payload:)`` to all but the
+sender. A controller sends one with `conn.channels`:
+
+```swift
+try await conn.channels.broadcast(topic: "room:lobby", event: "new_msg", payload: ["body": "Closing soon"])
+```
+
+A channel that lists an event in ``Channel/intercepts`` sees it once for each
+socket that receives it, as Phoenix's `handle_out` does:
+``Channel/intercept(event:payload:socket:)`` returns the payload for that
+socket, or throws ``ChannelError/halt`` to skip it.
+
+With ``RoostApp/pubSub``, broadcasts go through it, so ``ValkeyPubSub``
+delivers them to the sockets of every server.
+
 ## Track who's online
 
 ``Presence`` tracks the sockets of a topic under a key, such as a user ID,
@@ -123,8 +141,9 @@ HTTP/1.1 connection. A reverse proxy must pass the `Upgrade` and `Connection`
 headers on, and the original `Host`, which the origin check compares.
 
 When the app stops, the server closes each socket, and phoenix.js reconnects to
-a server that's still running. Each server keeps its own sockets, so a
-broadcast reaches the clients of the server that sends it.
+a server that's still running. Broadcasts reach the sockets of every server
+that shares the app's PubSub. Presence covers each server's own sockets, so
+deploy one server, or use broadcasts, when clients must see everyone online.
 
 ## Test channels
 

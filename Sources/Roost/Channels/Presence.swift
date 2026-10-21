@@ -50,10 +50,8 @@ public enum Presence {
         meta["phx_ref"] = UUID().uuidString
         _ = try JSONValue(meta)
         registry.trackPresence(socketID: socket.id, topic: topic, key: key, meta: meta)
-        try await registry.deliver(
-            topic: topic, event: "presence_diff", payload: diff(joins: [key: [meta]]), from: socket,
-            excludeSender: true
-        )
+        await registry.deliverLocally(topic: topic, event: "presence_diff", payload: diff(joins: [key: [meta]]),
+                                      except: socket.id)
         let state = registry.listPresence(topic: topic).map { ($0.key, ["metas": $0.metas] as ChannelPayload) }
         try await socket.push(event: "presence_state", payload: Dictionary(state) { first, _ in first })
     }
@@ -82,9 +80,8 @@ public enum Presence {
     private static func announce(leaves: [String: [ChannelPayload]], topic: String, from socket: ChannelSocket) async {
         let leaves = leaves.filter { !$0.value.isEmpty }
         guard !leaves.isEmpty else { return }
-        try? await socket.registry?.deliver(
-            topic: topic, event: "presence_diff", payload: diff(leaves: leaves), from: socket, excludeSender: true
-        )
+        await socket.registry?.deliverLocally(topic: topic, event: "presence_diff", payload: diff(leaves: leaves),
+                                              except: socket.id)
     }
 
     /// A `presence_diff` payload: `{"joins": {key: {"metas": […]}}, "leaves": {…}}`.

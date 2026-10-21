@@ -194,7 +194,7 @@ extension RoostApp {
         let pubSubAdapter = app.pubSub
 
         // Channel setup
-        let channelRegistry = ChannelRegistry(router: app.channels)
+        let channelRegistry = ChannelRegistry(router: app.channels, pubSub: pubSubAdapter)
 
         let inMemoryJobs = jobQueueAdapter as? InMemoryJobQueue
         inMemoryJobs?.registerSchedule(app.scheduledJobs)
