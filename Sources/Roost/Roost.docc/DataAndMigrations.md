@@ -218,12 +218,14 @@ ROOST_ENV=test roost migrate up
 ```
 
 The CLI invokes the app's migration command, so the CLI and server use the same
-database configuration. Create the development and test databases first.
+database configuration. Create the development and test databases first with
+`roost db create`, or create, migrate, and seed them with `roost db setup`.
 Starting a server does not apply migrations automatically.
 
 For a disposable development database, `roost migrate down` rolls back
-the latest migration. It executes the file's down section, which may remove
-data; inspect that SQL before using it.
+the latest migration; `--step 2` rolls back the two newest, and `--all` every
+one. It executes each file's down section, which may remove data; inspect that
+SQL before using it.
 
 ### Run the release binary
 

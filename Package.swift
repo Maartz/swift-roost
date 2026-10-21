@@ -26,25 +26,18 @@ let package = Package(
         .library(name: "RoostTest", targets: ["RoostTest"]),
     ],
     traits: [
-        // Off by default: SwiftPM 6.4 cannot resolve a dependency trait enabled through a
-        // default trait of a non-root package. Apps opt in with
-        // `traits: [.defaults, "RichTerminal"]` on swift-roost, as `roost new` writes it.
-        .trait(name: "RichTerminal",
-               description: "Colors, spinners, prompts, and styled tables in `roost spectro`, from Spectro's Noora output."),
+        // No effect since roost-cli dropped `roost spectro`. Declared so apps that enable
+        // it, as `roost new` used to write, still resolve.
+        .trait(name: "RichTerminal", description: "No effect; kept for apps that enable it."),
         // Off by default, so apps without a Valkey store don't fetch valkey-swift.
         .trait(name: "Valkey",
                description: "A Valkey or Redis server as the app's key-value store: `ROOST_STORE_URL=valkey://…`."),
         .default(enabledTraits: []),
     ],
     dependencies: [
-        // `roost spectro` builds the app's own spectro command, which needs `CLI`. Roost's
-        // `RichTerminal` trait passes Spectro's on; without it spectro prints plain text
-        // and Noora is not fetched. `Migrations` gives `App migrate` Spectro's migration
-        // command; it shares ArgumentParser with `CLI`.
-        ecosystem("Spectro", from: "2.3.1", traits: [
-            "CLI", "Migrations",
-            .trait(name: "RichTerminal", condition: .when(traits: ["RichTerminal"])),
-        ]),
+        // `Migrations` gives `App migrate` Spectro's migration command. Without `CLI`,
+        // apps don't build the spectro executable or fetch Noora.
+        ecosystem("Spectro", from: "2.3.1", traits: ["Migrations"]),
         // Roost doesn't use Nexus's Vapor adapter.
         ecosystem("Nexus", from: "2.1.0", traits: []),
         ecosystem("ESW", from: "1.7.0"),

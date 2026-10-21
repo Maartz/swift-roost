@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.4.0 — 2026-10-21
+
+The app commands that roost-cli 3.0's `roost db` and `roost routes` run, and SQL
+rollbacks of more than one migration. Apps no longer build Spectro's CLI.
+
+- `App db create|drop|seed|setup|reset` manages the database with the server's
+  configuration, like `mix ecto.create` and friends. `setup` creates the
+  database, runs pending migrations, and runs `Seeds/<env>.sql` when it exists;
+  `reset` drops the database first. `drop` and `reset` refuse `ROOST_ENV=prod`.
+  The `roost db` command in roost-cli runs them.
+- `App routes` lists each route's method and path in matching order, like
+  `mix phx.routes`. The `roost routes` command in roost-cli runs it.
+- `App migrate down` takes `--step N` and `--all` for SQL migrations too, as it
+  already did for a migration registry. A usage error prints the usage and
+  exits with status 64, and a database error prints PostgreSQL's message and
+  exits with status 1, instead of crashing with "Error raised at top level".
+- Roost no longer enables Spectro's `CLI` trait, so apps don't build the
+  `spectro` executable or fetch Noora. roost-cli no longer runs it: `roost db`
+  and `roost migrate` use the app's own configuration. The `RichTerminal` trait
+  has no effect and stays declared, so apps that enable it still resolve.
+
 ## 2.3.0 — 2026-10-19
 
 Live pages and reusable form fields join typed data operations, migration registries,

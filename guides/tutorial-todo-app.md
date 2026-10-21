@@ -19,7 +19,7 @@ Install the Roost CLI with [Mint](https://github.com/yonaskolb/Mint) and add
 
 ```sh
 brew install mint
-mint install roost-framework/roost-cli@2.1.1
+mint install roost-framework/roost-cli@3.0.0
 ```
 
 Without Mint, build from a checkout as described in the
@@ -67,10 +67,8 @@ Configure the local database. For example, with Postgres.app's local user:
 ```sh
 export DB_USER="$USER"
 export DB_PASSWORD=""
-createdb todo_app_dev
-createdb todo_app_test
-roost migrate
-ROOST_ENV=test roost migrate
+roost db setup
+ROOST_ENV=test roost db setup
 swift test
 roost server --port 8080
 ```
