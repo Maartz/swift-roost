@@ -25,6 +25,7 @@ for the current implementation boundaries.
 - <doc:ViewsAndForms>
 - <doc:DataAndMigrations>
 - <doc:KeyValueStores>
+- <doc:BackgroundJobs>
 - <doc:AuthenticationAndSessions>
 - <doc:CLIAndGenerators>
 
@@ -109,8 +110,6 @@ for the current implementation boundaries.
 - ``RoostPubSub``
 - ``InMemoryPubSub``
 - ``ValkeyPubSub``
-- ``RoostJob``
-- ``InMemoryJobQueue``
 - ``Email``
 - ``MailDelivery``
 - ``TestDelivery``

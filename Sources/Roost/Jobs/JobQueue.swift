@@ -1,4 +1,5 @@
 import Foundation
+import Jobs
 import Nexus
 import Spectro
 
@@ -26,6 +27,8 @@ public struct ScheduledJobEntry: @unchecked Sendable {
     public let interval: Duration?
 
     let execute: @Sendable (JobContext) async throws -> Void
+    /// The job on a swift-jobs schedule, for ``PostgresJobQueue``.
+    let element: @Sendable (Schedule) -> JobSchedule.Element
 
     /// A type-erased reference to the job's type, for test comparison.
     public var jobType: Any.Type { _jobType }
@@ -36,12 +39,13 @@ public struct ScheduledJobEntry: @unchecked Sendable {
         jobTypeName == String(describing: J.self)
     }
 
-    init(jobTypeName: String, cron: String?, interval: Duration?, execute: @Sendable @escaping (JobContext) async throws -> Void, jobType: Any.Type) {
-        self.jobTypeName = jobTypeName
+    init<J: RoostJob>(_ type: J.Type, parameters: J.Parameters, cron: String?, interval: Duration?) {
+        self.jobTypeName = String(describing: J.self)
         self.cron = cron
         self.interval = interval
-        self.execute = execute
-        self._jobType = jobType
+        self.execute = { ctx in try await J().execute(parameters: parameters, context: ctx) }
+        self.element = { JobSchedule.Element(JobName(J.name, parameters: J.Parameters.self), parameters: parameters, schedule: $0) }
+        self._jobType = J.self
     }
 }
 
@@ -194,8 +198,14 @@ public enum JobQueue {
         InMemoryJobQueue(runInline: runInline)
     }
 
-    /// Creates a Postgres-backed durable queue (not yet implemented).
-    @available(*, deprecated, message: "The Postgres job queue isn't implemented: this stops the process. Use JobQueue.inMemory(). Roost 3.0 removes it from the stable API until it is implemented.")
+    /// A queue in the app's PostgreSQL database that runs `jobs` in the
+    /// background. See ``PostgresJobQueue``.
+    public static func postgres(_ jobs: any RoostJob.Type...) -> PostgresJobQueue {
+        PostgresJobQueue(jobs: jobs)
+    }
+
+    /// A stub that stops the process.
+    @available(*, deprecated, message: "This stub stops the process. Use JobQueue.postgres(_:) with the app's job types. Roost 3.0 removes it.")
     public static func postgres(spectro: SpectroClient) -> any RoostJobQueue {
         fatalError("Postgres job queue not yet implemented — use JobQueue.inMemory() for tests")
     }
@@ -209,13 +219,7 @@ public func schedule<J: RoostJob>(
     parameters: J.Parameters,
     cron: String
 ) -> ScheduledJobEntry {
-    ScheduledJobEntry(
-        jobTypeName: String(describing: J.self),
-        cron: cron,
-        interval: nil,
-        execute: { ctx in try await J().execute(parameters: parameters, context: ctx) },
-        jobType: J.self
-    )
+    ScheduledJobEntry(type, parameters: parameters, cron: cron, interval: nil)
 }
 
 /// Schedules a job to run at a fixed interval (e.g. `.seconds(7 * 24 * 3600)`).
@@ -224,13 +228,7 @@ public func schedule<J: RoostJob>(
     parameters: J.Parameters,
     every interval: Duration
 ) -> ScheduledJobEntry {
-    ScheduledJobEntry(
-        jobTypeName: String(describing: J.self),
-        cron: nil,
-        interval: interval,
-        execute: { ctx in try await J().execute(parameters: parameters, context: ctx) },
-        jobType: J.self
-    )
+    ScheduledJobEntry(type, parameters: parameters, cron: nil, interval: interval)
 }
 
 // MARK: - Connection injection

@@ -10,7 +10,7 @@ import Spectro
 ///
 /// > Note: This is a stub implementation. The worker is wired into the
 /// lifecycle but the polling/execution loop is not yet connected.
-@available(*, deprecated, message: "JobWorker is a stub: it never runs a job. Roost 3.0 removes it from the stable API until it is implemented.")
+@available(*, deprecated, message: "JobWorker is a stub: it never runs a job. PostgresJobQueue runs jobs from PostgreSQL. Roost 3.0 removes it.")
 public actor JobWorker {
     private let store: PostgresJobStore
     private let spectro: SpectroClient

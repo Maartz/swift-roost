@@ -62,8 +62,12 @@ public protocol RoostApp {
     /// Default: empty router (no channels configured).
     var channels: ChannelRouter { get }
 
-    /// Job queue driver. Return `JobQueue.inMemory()`; its jobs don't survive a restart.
-    /// Default: `nil` (no job queue configured).
+    /// Job queue driver. Default: `nil` (no job queue configured).
+    ///
+    /// Return ``PostgresJobQueue``, from `JobQueue.postgres(_:)`, to run jobs in
+    /// the background from the app's database; the app runs its workers.
+    /// `JobQueue.inMemory()` runs each job inside `push`, and keeps nothing
+    /// across a restart.
     var jobs: (any RoostJobQueue)? { get }
 
     /// Recurring jobs to run on a schedule.
@@ -178,10 +182,13 @@ extension RoostApp {
             break
         }
 
-        // A store or server configuration error stops the app before it opens the database.
+        // A store, server, or job queue configuration error stops the app before it opens the database.
         let store = try app.store.resolve(app: String(describing: Self.self), environment: Roost.env)
         let config = app.server
         let serverBuilder = try config.serverBuilder()
+        let jobQueueAdapter = app.jobs
+        let postgresJobs = jobQueueAdapter as? PostgresJobQueue
+        try await postgresJobs?.prepare(database: app.database, schedule: app.scheduledJobs)
 
         // PubSub setup (call once to get a stable shared instance)
         let pubSubAdapter = app.pubSub
@@ -189,11 +196,8 @@ extension RoostApp {
         // Channel setup
         let channelRegistry = ChannelRegistry(router: app.channels)
 
-        // Job queue setup
-        let jobQueueAdapter = app.jobs
-        if let inMemory = jobQueueAdapter as? InMemoryJobQueue {
-            inMemory.registerSchedule(app.scheduledJobs)
-        }
+        let inMemoryJobs = jobQueueAdapter as? InMemoryJobQueue
+        inMemoryJobs?.registerSchedule(app.scheduledJobs)
 
         // Database setup
         var spectro: SpectroClient?
@@ -206,6 +210,8 @@ extension RoostApp {
                 database: dbConfig.database
             )
             spectro = client
+            postgresJobs?.spectro = client
+            inMemoryJobs?.spectro = client
             do { try await app.willStart(spectro: client) }
             catch {
                 await client.shutdown()
@@ -224,12 +230,13 @@ extension RoostApp {
         }
 
         let adapter = NexusHummingbirdAdapter(plug: finalPlug)
-        // The server stops accepting requests before the store and PubSub connections close.
+        // Services stop in reverse order, after the server stops accepting requests:
+        // the job workers finish before the PubSub and store connections close.
         let server = Application(
             responder: adapter,
             server: serverBuilder,
             configuration: .init(address: .hostname(config.host, port: config.port)),
-            services: store.services + [pubSubAdapter as? any Service].compactMap { $0 }
+            services: store.services + [pubSubAdapter as? any Service, postgresJobs].compactMap { $0 }
         )
 
         do {

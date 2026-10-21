@@ -15,7 +15,7 @@ import Spectro
 /// - Atomic job claiming with `FOR UPDATE SKIP LOCKED`
 /// - Exponential backoff retry with jitter
 /// - Cleanup of expired completed jobs
-@available(*, deprecated, message: "PostgresJobStore is a stub: its methods store and return nothing. Roost 3.0 removes it from the stable API until it is implemented.")
+@available(*, deprecated, message: "PostgresJobStore is a stub: its methods store and return nothing. Use PostgresJobQueue. Roost 3.0 removes it.")
 public actor PostgresJobStore {
     private let client: SpectroClient
 

@@ -71,6 +71,11 @@ let package = Package(
             url: "https://github.com/apple/swift-nio-ssl.git",
             from: "2.29.0"
         ),
+        // Background jobs, kept in the app's PostgreSQL database.
+        .package(url: "https://github.com/hummingbird-project/swift-jobs.git", from: "1.4.0"),
+        .package(url: "https://github.com/hummingbird-project/swift-jobs-postgres.git", from: "1.5.0"),
+        .package(url: "https://github.com/hummingbird-project/postgres-migrations.git", from: "1.1.0"),
+        .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.30.1"),
     ],
     targets: [
         .target(
@@ -94,6 +99,10 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Valkey", package: "valkey-swift", condition: .when(traits: ["Valkey"])),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(name: "Jobs", package: "swift-jobs"),
+                .product(name: "JobsPostgres", package: "swift-jobs-postgres"),
+                .product(name: "PostgresMigrations", package: "postgres-migrations"),
+                .product(name: "PostgresNIO", package: "postgres-nio"),
             ]
         ),
         .target(
@@ -112,6 +121,7 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "InMemoryTracing", package: "swift-distributed-tracing"),
                 .product(name: "HummingbirdTesting", package: "hummingbird"),
+                .product(name: "PostgresNIO", package: "postgres-nio"),
                 .product(name: "Logging", package: "swift-log"),
             ]
         ),

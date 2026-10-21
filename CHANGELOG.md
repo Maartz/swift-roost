@@ -24,6 +24,15 @@
   with an error instead.
 - `LiveRoute(_:pubSub:)` sends broadcasts through a PubSub, so they update the
   pages open on every server. The page's `Info` must be `Codable`.
+- `JobQueue.postgres(_:)` returns a `PostgresJobQueue`, which keeps jobs in the
+  app's PostgreSQL database through swift-jobs. Return it from `RoostApp.jobs`
+  with the app's job types, and the app runs its workers: jobs survive restarts,
+  run on every server, retry with backoff under their `retryStrategy`, and log
+  their failures. `RoostApp.scheduledJobs` with cron expressions run from one
+  server at a time. The queue creates its tables in a `swift_jobs` schema at
+  startup. `JobQueue.postgres(spectro:)` stays a deprecated stub.
+- Jobs of a `JobQueue.inMemory()` queue receive the app's database client in
+  `JobContext.spectro`, which was `nil` outside tests.
 - Roost requires macOS 15 or later on macOS, as swift-jobs does. Linux is
   unaffected.
 

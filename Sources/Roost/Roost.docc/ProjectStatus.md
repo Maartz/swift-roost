@@ -30,7 +30,7 @@ does not run that check or establish production readiness.
 | Key-value store | Memory and Valkey stores work; Valkey needs the `Valkey` trait. Hummingbird persist drivers can back it, without atomic counters. |
 | Sessions | `KeyValueSessionStore` persists sessions in the key-value store; `MemorySessionStore` works within one process. |
 | PubSub | `InMemoryPubSub` delivers within one process; `ValkeyPubSub` delivers between servers with the `Valkey` trait. |
-| Jobs | In-memory queue is available; the PostgreSQL store is a stub. |
+| Jobs | `PostgresJobQueue` runs jobs in the background from the app's database, with retries and cron schedules; `InMemoryJobQueue` runs each job inside `push`. See <doc:BackgroundJobs>. |
 | Mail | Logger and test deliveries are available; SMTP delivery is a stub. |
 | Channels | In-process registry and test helpers exist; the HTTP upgrade route is a stub. |
 | TLS / HTTP/2 | `ServerConfig(tls:)` serves HTTPS and negotiates HTTP/2, falling back to HTTP/1.1. HTTP/2 without TLS is rejected at startup. |
