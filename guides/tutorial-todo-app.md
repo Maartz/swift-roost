@@ -19,7 +19,7 @@ Install the Roost CLI with [Mint](https://github.com/yonaskolb/Mint) and add
 
 ```sh
 brew install mint
-mint install roost-framework/roost-cli@2.1.1
+mint install roost-framework/roost-cli@3.0.0
 ```
 
 Without Mint, build from a checkout as described in the

@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 2.4.0 — 2026-10-21
+
+The app commands that roost-cli 3.0's `roost db` and `roost routes` run, and SQL
+rollbacks of more than one migration. Apps no longer build Spectro's CLI.
 
 - `App db create|drop|seed|setup|reset` manages the database with the server's
   configuration, like `mix ecto.create` and friends. `setup` creates the
