@@ -192,20 +192,7 @@ Then copy `.build/release/roost` to a directory on your `PATH`.
 Generated apps download Roost 2.3.0, Spectro 2.x (from 2.3.1), Nexus 2.x (from 2.1.0),
 and ESW 1.7.0 through SwiftPM. No companion source checkouts or dependency overrides are needed.
 Roost turns off Nexus's default `Vapor` trait, so SwiftPM skips Vapor and its dependencies.
-Generated apps enable Roost's `RichTerminal` trait, which gives `roost spectro` Spectro's
-colors, spinners, and styled tables:
-
-```swift
-.package(url: "https://github.com/roost-framework/swift-roost", from: "2.3.0",
-         traits: [.defaults, "RichTerminal"])
-```
-
-Leave the trait out to skip downloading Noora (about 80 MB the first time on a
-machine); `roost spectro` then prints plain text. Existing apps retain their
-resolved versions until you run `swift package update`. To add the trait to an
-existing app, run `swift package update swift-roost` first, then add the trait
-and run `swift package resolve`: SwiftPM rejects a trait that the app's
-currently resolved release doesn't declare.
+Existing apps retain their resolved versions until you run `swift package update`.
 
 From Roost 2.3, the `Valkey` trait lets the app's key-value store and sessions
 live on a Valkey or Redis server: add `"Valkey"` to the traits and set
@@ -435,10 +422,10 @@ Run `roost <command> --help` for options.
 | `roost gen live Post title:string`                            | Generate an HTML resource whose index is a live page, like `mix phx.gen.live`.  |
 | `roost gen migration add_post_index`                          | Create an empty SQL migration.                                                  |
 | `roost migrate up\|down\|status`                              | Apply, roll back, or inspect migrations using the app's database configuration. |
+| `roost migrate down --step 2`                                 | Roll back the two newest migrations; `--all` rolls back every one.              |
 | `roost db setup`                                              | Create the database, migrate it, and run `Seeds/<env>.sql` when it exists.      |
 | `roost db create\|drop\|seed\|reset`                          | Create, drop, or seed the database; `reset` drops it and runs `setup`.          |
 | `roost routes`                                                | List every route's method and path in matching order.                          |
-| `roost spectro database create my_app_dev`                    | Run any `spectro` command with the Spectro version in the app's `Package.resolved`. |
 | `roost server --port 8080`                                    | Build, serve, and watch for changes.                                            |
 | `roost build`                                                 | Build the app and configured CSS assets.                                        |
 | `roost gen dockerfile`                                        | Generate a multi-stage Linux Dockerfile.                                        |

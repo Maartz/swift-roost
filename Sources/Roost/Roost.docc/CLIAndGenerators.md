@@ -101,32 +101,12 @@ Its `./dev` and `./check` helpers own local setup and disposable test databases.
 | `gen live Post title:string` | HTML resource whose index is a `LivePage`: list, validated create form, and delete without reloads. |
 | `gen migration add_post_index` | Empty SQL migration to fill in. |
 | `migrate up / down / status` | App-configured migration operations. |
+| `migrate down --step 2` | Roll back the two newest migrations; `--all` rolls back every one. |
 | `db setup` | Create the database, migrate it, and run `Seeds/<env>.sql` when it exists. |
 | `db create / drop / seed / reset` | Create, drop, or seed the database; `reset` drops it and runs `setup`. |
 | `routes` | Every route's method and path, in matching order. |
-| `spectro database create my_app_dev` | Any `spectro` command, run with the app's resolved Spectro version. |
 | `server --port 8080` | Build, serve, and watch for edits. |
 | `build` | Build the app and its configured CSS assets. |
 | `gen dockerfile` | Generate the Linux container build and runtime recipe. |
 
 Run `roost <command> --help` for the command's supported options.
-`roost spectro` runs the `spectro` executable from the app's own dependencies,
-so its version always matches `Package.resolved`. Use it to create or drop
-databases. There is no seed command.
-
-Generated apps depend on swift-roost with `traits: [.defaults, "RichTerminal"]`,
-which gives `roost spectro` colors, spinners, and styled tables. Without the
-trait, `spectro` prints the same information as plain text and SwiftPM doesn't
-download Noora. Add the trait to an app created before roost-cli 2.1.1 the same
-way, with `from: "2.1.3"` or later.
-
-Update swift-roost before adding the trait to an existing app. SwiftPM checks
-traits against the version an app already resolved, and releases before 2.1.3
-declare none, so adding the trait first fails with "enables traits
-[RichTerminal, default] on package 'swift-roost' that declares no traits":
-
-```sh
-swift package update swift-roost   # with the old dependency line
-# then add traits: [.defaults, "RichTerminal"] and run:
-swift package resolve
-```

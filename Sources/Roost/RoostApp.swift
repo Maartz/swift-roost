@@ -157,8 +157,13 @@ extension RoostApp {
         let arguments = Array(CommandLine.arguments.dropFirst(2))
         switch CommandLine.arguments.dropFirst().first {
         case "migrate":
-            let status = try await app.runMigrationCommand(arguments)
-            if status != 0 { exit(status) }
+            do {
+                let status = try await app.runMigrationCommand(arguments)
+                if status != 0 { exit(status) }
+            } catch {
+                FileHandle.standardError.write(Data("Error: \(Self.postgresMessage(error))\n".utf8))
+                exit(1)
+            }
             return
         case "db":
             let status = await app.runDatabaseCommand(arguments)

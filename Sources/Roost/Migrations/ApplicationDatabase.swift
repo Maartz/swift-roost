@@ -106,7 +106,7 @@ extension RoostApp {
     }
 
     /// PostgreSQL's own message, which `PSQLError`'s description withholds.
-    private static func postgresMessage(_ error: any Error) -> String {
+    static func postgresMessage(_ error: any Error) -> String {
         if case SpectroError.queryExecutionFailed(_, let underlying) = error { return postgresMessage(underlying) }
         if let postgres = error as? PSQLError {
             if let message = postgres.serverInfo?[.message] { return message }

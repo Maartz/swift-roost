@@ -683,8 +683,8 @@ struct MigrationRegistryCommandTests {
     }
 
     @Test("apps without a registry keep the SQL command's usage check")
-    func sqlCommandUsage() async {
-        await #expect(throws: (any Error).self) { try await MinimalMigrationApp().runMigrationCommand(["plan"]) }
+    func sqlCommandUsage() async throws {
+        #expect(try await MinimalMigrationApp().runMigrationCommand(["plan"]) == 64)
     }
 }
 

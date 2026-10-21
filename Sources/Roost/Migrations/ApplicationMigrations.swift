@@ -6,10 +6,10 @@ extension RoostApp {
     /// Run migrations with exactly the same database configuration as the server.
     /// Available in a compiled release too: `MyApp migrate up|down|status`.
     ///
-    /// When the app declares ``RoostApp/migrations``, Spectro's migration command
-    /// runs the registry and also accepts `plan` and its options. `down` without
-    /// `--step` still rolls back only the newest migration; `down --all` rolls
-    /// back every one.
+    /// `down` rolls back the newest migration, `down --step N` the newest N, and
+    /// `down --all` every one. When the app declares ``RoostApp/migrations``,
+    /// Spectro's migration command runs the registry and also accepts `plan` and
+    /// its options.
     ///
     /// - Returns: The process exit status.
     package func runMigrationCommand(_ arguments: [String]) async throws -> Int32 {
@@ -37,8 +37,20 @@ extension RoostApp {
                     username: config.username, password: config.password, database: config.database)
             }
         }
-        guard arguments.count == 1, ["up", "down", "status"].contains(arguments[0]) else {
-            throw MigrationCommandError("Usage: \(Self.self) migrate up|down|status")
+        let usage = "Usage: \(Self.self) migrate up|status|down [--step N|--all]"
+        if Self.asksForHelp(arguments) {
+            print(usage)
+            return 0
+        }
+        let steps: Int
+        do {
+            guard ["up", "down", "status"].contains(arguments[0]), arguments[0] == "down" || arguments.count == 1 else {
+                throw MigrationCommandError(usage)
+            }
+            steps = try Self.rollbackSteps(Array(arguments.dropFirst()))
+        } catch {
+            FileHandle.standardError.write(Data("Error: \(error)\n".utf8))
+            return 64  // EX_USAGE
         }
         guard let config = database else { throw MigrationCommandError("No database configured in \(Self.self).") }
         let client = try SpectroClient(hostname: config.hostname, port: config.port,
@@ -50,7 +62,7 @@ extension RoostApp {
                 let pending = try await migrator.pending()
                 print("Applying \(pending.count) migration(s) to \(config.database)")
                 try await migrator.migrate()
-            case "down": try await migrator.rollback()
+            case "down": try await migrator.rollback(steps: steps)
             default: try await migrator.status().printReport()
             }
         } catch {
@@ -65,6 +77,19 @@ extension RoostApp {
     package static func asksForHelp(_ arguments: [String]) -> Bool {
         arguments.isEmpty || arguments.first == "help"
             || arguments.contains { ["--help", "-h", "-help"].contains($0) }
+    }
+
+    /// How many SQL migrations `down` rolls back: the newest by default, `--step N`,
+    /// or every one with `--all` (`Int.max`).
+    package static func rollbackSteps(_ options: [String]) throws -> Int {
+        if options.isEmpty { return 1 }
+        if options == ["--all"] { return .max }
+        let value = options.count == 2 && options[0] == "--step" ? options[1]
+            : options.count == 1 && options[0].hasPrefix("--step=") ? String(options[0].dropFirst("--step=".count)) : nil
+        guard let steps = value.flatMap(Int.init), steps >= 0 else {
+            throw MigrationCommandError("down takes --step N, with N 0 or more, or --all.")
+        }
+        return steps
     }
 
     /// Spectro's `down` rolls back every migration unless `--step` is given.
