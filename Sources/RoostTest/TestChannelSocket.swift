@@ -75,6 +75,7 @@ public final class TestChannelSocket: @unchecked Sendable {
             let replyPayload = try await handler.join(topic: topic, payload: payload, socket: socket)
             return ChannelReply(status: "ok", payload: replyPayload)
         } catch {
+            await Presence.untrackAll(socket, topic: topic)
             registry.unregister(socket, topic: topic)
             lock.withLock { joinedTopics.removeAll { $0 == topic } }
             throw error
@@ -86,6 +87,7 @@ public final class TestChannelSocket: @unchecked Sendable {
         if let handler = router.handler(for: topic) {
             await handler.leave(topic: topic, payload: [:], socket: socket)
         }
+        await Presence.untrackAll(socket, topic: topic)
         registry.unregister(socket, topic: topic)
         lock.withLock { joinedTopics.removeAll { $0 == topic } }
         return ChannelReply(status: "ok", payload: [:])

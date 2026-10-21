@@ -46,9 +46,24 @@ private struct LobbyChannel: Channel {
     }
 }
 
+private struct PresenceChannel: Channel {
+    func join(topic: String, payload: ChannelPayload, socket: ChannelSocket) async throws -> ChannelPayload {
+        let user = socket.assigns["user"] as? String ?? ""
+        try await Presence.track(socket, topic: topic, key: user, meta: ["name": user])
+        return [:]
+    }
+
+    func handle(event: String, payload: ChannelPayload, socket: ChannelSocket) async throws {}
+
+    func leave(topic: String, payload: ChannelPayload, socket: ChannelSocket) async {}
+}
+
 private struct SocketApp: RoostApp {
     var channels: ChannelRouter {
-        ChannelRouter { on("room:*", LobbyChannel.self) }
+        ChannelRouter {
+            on("room:*", LobbyChannel.self)
+            on("presence:*", PresenceChannel.self)
+        }
     }
 
     var plugs: [Plug] { [{ conn in conn.assign(key: "greeting", value: "hello") }] }
@@ -250,6 +265,32 @@ struct ChannelSocketTests {
                 _ = try await phoenix.join("room:lobby", ref: "1")
             }
             try await Departures.shared.wait(for: user)
+        }
+    }
+
+    @Test func presenceFollowsSocketsAsPhoenixJSReadsIt() async throws {
+        try await serve { client in
+            try await client.ws("/socket/websocket?user=ada") { inbound, outbound, _ in
+                var ada = PhoenixClient(inbound, outbound)
+                try await ada.send("1", "1", "presence:lobby", "phx_join")
+                let state = try await ada.receive()
+                #expect(state.joinRef == "1" && state.event == "presence_state")
+                let adaMetas = (state.payload["ada"] as? [String: Any])?["metas"] as? [[String: Any]]
+                #expect(adaMetas?.first?["name"] as? String == "ada" && adaMetas?.first?["phx_ref"] is String)
+                #expect(try await ada.receive().event == "phx_reply")
+
+                try await client.ws("/socket/websocket?user=bob") { inbound, outbound, _ in
+                    var bob = PhoenixClient(inbound, outbound)
+                    _ = try await bob.join("presence:lobby", ref: "5")
+                }
+                let joined = try await ada.receive()
+                #expect(joined.event == "presence_diff")
+                #expect((joined.payload["joins"] as? [String: Any])?["bob"] != nil)
+                // Bob's socket closed without leaving.
+                let left = try await ada.receive()
+                #expect(left.event == "presence_diff")
+                #expect((left.payload["leaves"] as? [String: Any])?["bob"] != nil)
+            }
         }
     }
 

@@ -58,28 +58,36 @@ public final class ChannelRegistry: @unchecked Sendable {
 
     /// Removes the specific socketID's meta for `key` under `topic`.
     /// Removes the key entirely when all metas are gone.
-    public func untrackPresence(socketID: UUID, topic: String, key: String) {
+    ///
+    /// - Returns: The metas it removed.
+    @discardableResult
+    public func untrackPresence(socketID: UUID, topic: String, key: String) -> [ChannelPayload] {
         lock.withLock {
+            let removed = presenceState[topic]?[key]?.filter { $0.socketID == socketID }.map(\.meta) ?? []
             presenceState[topic]?[key]?.removeAll { $0.socketID == socketID }
             if presenceState[topic]?[key]?.isEmpty == true {
                 presenceState[topic]?.removeValue(forKey: key)
             }
+            return removed
         }
     }
 
-    /// Removes ALL presence entries for `socketID` across all keys in `topic`.
-    /// Used by `TestChannelSocket.deinit` for connection-drop cleanup.
-    public func untrackAllPresence(socketID: UUID, topic: String) {
+    /// Removes ALL presence entries for `socketID` across all keys in `topic`,
+    /// when the socket leaves the topic.
+    ///
+    /// - Returns: The metas it removed, by key.
+    @discardableResult
+    public func untrackAllPresence(socketID: UUID, topic: String) -> [String: [ChannelPayload]] {
         lock.withLock {
-            for key in presenceState[topic]?.keys ?? [:].keys {
-                presenceState[topic]?[key]?.removeAll { $0.socketID == socketID }
+            var removed: [String: [ChannelPayload]] = [:]
+            for (key, metas) in presenceState[topic] ?? [:] {
+                let left = metas.filter { $0.socketID == socketID }
+                guard !left.isEmpty else { continue }
+                removed[key] = left.map(\.meta)
+                let staying = metas.filter { $0.socketID != socketID }
+                presenceState[topic]?[key] = staying.isEmpty ? nil : staying
             }
-            // Remove empty keys
-            presenceState[topic]?.keys.forEach { key in
-                if presenceState[topic]?[key]?.isEmpty == true {
-                    presenceState[topic]?.removeValue(forKey: key)
-                }
-            }
+            return removed
         }
     }
 

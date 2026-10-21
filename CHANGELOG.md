@@ -46,12 +46,21 @@
   missing keys.
 - `channel(_:)` stays deprecated: the server upgrades channel sockets before
   routing, so apps remove it from their routes.
+- Presence events follow Phoenix's format, so phoenix.js's `Presence` reads
+  them. `Presence.track` pushes `presence_state` with everyone present to the
+  tracked socket, and each meta gets a `phx_ref`. A `presence_diff`'s `joins`
+  and `leaves` map each key to `{"metas": [...]}`, instead of to a name. A
+  socket's presence ends when it leaves the topic or closes, with a
+  `presence_diff`, so channels no longer need `Presence.untrack` in `leave`.
 
 ### Upgrade
 
 On macOS, raise the app's platform to `.macOS(.v15)` in `Package.swift`.
 SwiftPM rejects a package that supports an older macOS than one of its
 dependencies.
+
+A test that reads a `presence_diff`'s `joins` or `leaves` as `[String: String]`
+reads each key's `["metas": [...]]` instead.
 
 ## 2.4.0 — 2026-10-21
 

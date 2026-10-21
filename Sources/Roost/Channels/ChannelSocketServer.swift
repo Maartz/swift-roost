@@ -161,8 +161,8 @@ private struct ChannelClient {
             memberships[message.topic] = Membership(joinRef: message.joinRef, socket: socket)
             reply(to: message, status: "ok", response)
         } catch {
+            await Presence.untrackAll(socket, topic: message.topic)
             registry.unregister(socket, topic: message.topic)
-            registry.untrackAllPresence(socketID: socket.id, topic: message.topic)
             reply(to: message, status: "error", reason(error))
         }
     }
@@ -196,8 +196,8 @@ private struct ChannelClient {
 
     private func leave(_ topic: String, _ membership: Membership, payload: ChannelPayload = [:]) async {
         await registry.router.handler(for: topic)?.leave(topic: topic, payload: payload, socket: membership.socket)
+        await Presence.untrackAll(membership.socket, topic: topic)
         registry.unregister(membership.socket, topic: topic)
-        registry.untrackAllPresence(socketID: membership.socket.id, topic: topic)
     }
 
     // MARK: - Frames

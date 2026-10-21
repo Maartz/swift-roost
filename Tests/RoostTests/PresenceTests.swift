@@ -14,21 +14,26 @@ private struct RoomChannel: Channel {
             throw ChannelError.unauthorized("Must be authenticated")
         }
         let userName = socket.assigns["userName"] as? String ?? "Anonymous"
-        // Capture presence BEFORE tracking self — reply shows who was already here
-        let currentPresence = await Presence.list(topic, socket: socket)
         try await Presence.track(socket, topic: topic, key: userID.uuidString, meta: [
             "name": userName,
             "online_at": Date().timeIntervalSince1970,
         ])
-        return ["presence": currentPresence as any Sendable]
+        return [:]
     }
 
-    func handle(event: String, payload: ChannelPayload, socket: ChannelSocket) async throws {}
-
-    func leave(topic: String, payload: ChannelPayload, socket: ChannelSocket) async {
-        guard let userID = socket.assigns["userID"] as? UUID else { return }
-        await Presence.untrack(socket, topic: topic, key: userID.uuidString)
+    func handle(event: String, payload: ChannelPayload, socket: ChannelSocket) async throws {
+        guard event == "away", let userID = socket.assigns["userID"] as? UUID else { return }
+        await Presence.untrack(socket, topic: socket.topic, key: userID.uuidString)
     }
+
+    // Leaving untracks the socket's presence without help.
+    func leave(topic: String, payload: ChannelPayload, socket: ChannelSocket) async {}
+}
+
+/// The metas of `key` in a `presence_state` payload, or in the `joins` or
+/// `leaves` of a `presence_diff`, as phoenix.js's `Presence` reads them.
+private func metas(_ key: String, in entries: Any?) -> [ChannelPayload] {
+    ((entries as? ChannelPayload)?[key] as? ChannelPayload)?["metas"] as? [ChannelPayload] ?? []
 }
 
 // MARK: - Fixture: ChatApp
@@ -46,7 +51,7 @@ private struct ChatApp: RoostApp {
 
 // MARK: - Tests
 
-@Suite("Presence Integration", .serialized)
+@Suite("Presence Integration", .serialized, .timeLimit(.minutes(1)))
 struct PresenceTests {
 
     // MARK: Track and List
@@ -90,18 +95,22 @@ struct PresenceTests {
             #expect(keys.contains(bobID.uuidString))
         }
 
-        @Test("Join reply includes current presence list")
-        func joinReplyIncludesPresence() async throws {
-            let appA  = try await TestApp(ChatApp.self, assigns: ["userID": UUID(), "userName": "Alice"])
+        @Test("A tracked socket receives presence_state with everyone present")
+        func trackedSocketReceivesState() async throws {
+            let aliceID = UUID()
+            let bobID   = UUID()
+            let appA  = try await TestApp(ChatApp.self, assigns: ["userID": aliceID, "userName": "Alice"])
             let alice = try await appA.connectSocket("/socket")
             _ = try await alice.join("room:lobby", payload: [:])
 
-            let appB  = try await TestApp(ChatApp.self, assigns: ["userID": UUID(), "userName": "Bob"])
+            let appB  = try await TestApp(ChatApp.self, assigns: ["userID": bobID, "userName": "Bob"])
             let bob   = try await appB.connectSocket("/socket")
-            let reply = try await bob.join("room:lobby", payload: [:])
+            _ = try await bob.join("room:lobby", payload: [:])
 
-            let presence = reply.payload["presence"] as? [PresenceEntry]
-            #expect(presence?.count == 1, "Bob should see Alice already present")
+            let state = try await bob.receive(event: "presence_state")
+            #expect(metas(aliceID.uuidString, in: state).first?["name"] as? String == "Alice")
+            #expect(metas(bobID.uuidString, in: state).first?["name"] as? String == "Bob")
+            #expect(metas(bobID.uuidString, in: state).first?["phx_ref"] is String)
         }
     }
 
@@ -112,18 +121,21 @@ struct PresenceTests {
 
         @Test("Existing subscribers receive presence_diff when a new user joins")
         func joinDiffBroadcast() async throws {
+            let bobID = UUID()
             let appA  = try await TestApp(ChatApp.self, assigns: ["userID": UUID(), "userName": "Alice"])
             let alice = try await appA.connectSocket("/socket")
             _ = try await alice.join("room:lobby", payload: [:])
 
-            let appB = try await TestApp(ChatApp.self, assigns: ["userID": UUID(), "userName": "Bob"])
+            let appB = try await TestApp(ChatApp.self, assigns: ["userID": bobID, "userName": "Bob"])
             let bob  = try await appB.connectSocket("/socket")
             _ = try await bob.join("room:lobby", payload: [:])
 
             // Alice should receive a diff telling her Bob joined
             let diff  = try await alice.receive(event: "presence_diff")
-            let joins = diff["joins"] as? [String: String]
-            #expect(joins?.isEmpty == false, "Alice should receive a joins diff for Bob")
+            let joins = metas(bobID.uuidString, in: diff["joins"])
+            #expect(joins.first?["name"] as? String == "Bob", "Alice should receive a joins diff for Bob")
+            #expect(joins.first?["phx_ref"] is String)
+            #expect((diff["leaves"] as? ChannelPayload)?.isEmpty == true)
         }
 
         @Test("Existing subscribers receive presence_diff when a user leaves")
@@ -138,14 +150,14 @@ struct PresenceTests {
             _ = try await alice.join("room:lobby", payload: [:])
             _ = try await bob.join("room:lobby", payload: [:])
 
-            // Drain Alice's join diff for Bob
-            _ = try? await alice.receive(event: "presence_diff")
+            let joined = try await alice.receive(event: "presence_diff")
+            let ref = metas(bobID.uuidString, in: joined["joins"]).first?["phx_ref"] as? String
 
             _ = try await bob.leave("room:lobby")
 
             let diff   = try await alice.receive(event: "presence_diff")
-            let leaves = diff["leaves"] as? [String: String]
-            #expect(leaves?[bobID.uuidString] != nil, "Alice should receive a leaves diff for Bob")
+            let leaves = metas(bobID.uuidString, in: diff["leaves"])
+            #expect(ref != nil && leaves.first?["phx_ref"] as? String == ref, "Alice should receive a leaves diff for Bob")
         }
 
         @Test("Untracked user disappears from Presence.list")
@@ -165,6 +177,28 @@ struct PresenceTests {
             let entries = await appA.presence.list("room:lobby")
             #expect(entries.count == 1)
             #expect(entries[0].key != bobID.uuidString)
+        }
+
+        @Test("Presence.untrack removes a key while the socket stays")
+        func untrackWhileJoined() async throws {
+            let bobID = UUID()
+            let appA  = try await TestApp(ChatApp.self, assigns: ["userID": UUID(), "userName": "Alice"])
+            let appB  = try await TestApp(ChatApp.self, assigns: ["userID": bobID,  "userName": "Bob"])
+
+            let alice = try await appA.connectSocket("/socket")
+            let bob   = try await appB.connectSocket("/socket")
+
+            _ = try await alice.join("room:lobby", payload: [:])
+            _ = try await bob.join("room:lobby", payload: [:])
+            _ = try await alice.receive(event: "presence_diff")
+
+            try await bob.push(event: "away")
+
+            let diff = try await alice.receive(event: "presence_diff")
+            #expect(metas(bobID.uuidString, in: diff["leaves"]).count == 1)
+            #expect(!(await appA.presence.list("room:lobby")).contains { $0.key == bobID.uuidString })
+            _ = try await bob.leave("room:lobby")
+            #expect(alice.receivedEvents(named: "presence_diff").isEmpty, "Bob left nothing to untrack")
         }
     }
 

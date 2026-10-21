@@ -89,6 +89,33 @@ reason `internal error`, and are logged.
 When a client leaves a topic, or its socket closes, Roost calls
 ``Channel/leave(topic:payload:socket:)``.
 
+## Track who's online
+
+``Presence`` tracks the sockets of a topic under a key, such as a user ID,
+with metadata for each socket:
+
+```swift
+func join(topic: String, payload: ChannelPayload, socket: ChannelSocket) async throws -> ChannelPayload {
+    try await Presence.track(socket, topic: topic, key: userID, meta: ["name": name])
+    return [:]
+}
+```
+
+The tracked socket receives a `presence_state` event with everyone present,
+and the topic's other sockets a `presence_diff` event, in the format of
+phoenix.js's `Presence`:
+
+```js
+import { Presence } from "phoenix"
+
+const presence = new Presence(room)
+presence.onSync(() => render(presence.list((id, { metas }) => ({ id, name: metas[0].name }))))
+```
+
+A user with two tabs has two metas under one key. A socket's presence ends when
+it leaves the topic or closes, and ``Presence/untrack(_:topic:key:)`` ends it
+sooner.
+
 ## Deploy
 
 A server with channels serves HTTPS over HTTP/1.1 only: a WebSocket upgrades an

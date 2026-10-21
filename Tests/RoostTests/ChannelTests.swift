@@ -84,7 +84,7 @@ private struct ChatApp: RoostApp {
 
 // MARK: - Tests
 
-@Suite("Channel Integration", .serialized)
+@Suite("Channel Integration", .serialized, .timeLimit(.minutes(1)))
 struct ChannelTests {
 
     // MARK: Join
