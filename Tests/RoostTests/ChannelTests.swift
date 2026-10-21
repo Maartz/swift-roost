@@ -213,6 +213,28 @@ struct ChannelTests {
         }
     }
 
+    // MARK: Payloads
+
+    @Suite("Payloads")
+    struct Payloads {
+
+        @Test("A payload that JSON can't hold throws, as it couldn't reach a client")
+        func nonJSONPayloadThrows() async throws {
+            let app    = try await TestApp(ChatApp.self, assigns: ["userID": UUID(), "userName": "Alice"])
+            let socket = try await app.connectSocket("/socket")
+            _ = try await socket.join("system:alerts", payload: [:])
+
+            await #expect(throws: EncodingError.self) {
+                try await app.channels.broadcast(topic: "system:alerts", event: "new_alert", payload: ["at": Date()])
+            }
+            await #expect(throws: EncodingError.self) {
+                try await socket.socket.push(event: "new_alert", payload: ["id": UUID()])
+            }
+            let nickname: String? = nil
+            try await socket.socket.push(event: "new_alert", payload: ["nickname": nickname as any Sendable])
+        }
+    }
+
     // MARK: Server Push
 
     @Suite("Server Push")

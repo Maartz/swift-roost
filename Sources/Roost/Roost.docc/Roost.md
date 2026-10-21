@@ -116,6 +116,7 @@ for the current implementation boundaries.
 
 ### Channels and presence
 
+- <doc:Channels>
 - ``Channel``
 - ``ChannelRouter``
 - ``ChannelSocket``
@@ -126,6 +127,6 @@ for the current implementation boundaries.
 
 - ``Nexus``
 
-The channel transport, external service adapters, and deployment limitations are
-described in <doc:ProjectStatus>. A reference page does not imply that its
+External service adapters and deployment limitations are described in
+<doc:ProjectStatus>. A reference page does not imply that its
 integration is complete.

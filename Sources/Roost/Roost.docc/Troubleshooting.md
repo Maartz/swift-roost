@@ -70,5 +70,4 @@ Playground has its own reload behavior.
 
 ### An API exists but its integration does not work
 
-Check <doc:ProjectStatus>. In particular, SMTP and network channel upgrades
-remain incomplete.
+Check <doc:ProjectStatus>. In particular, SMTP delivery remains incomplete.

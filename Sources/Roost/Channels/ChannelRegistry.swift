@@ -137,7 +137,10 @@ public final class ChannelRegistry: @unchecked Sendable {
 
     /// Broadcasts an event to all sockets on `topic` from outside a handler (e.g. background job).
     /// Does not run intercept hooks.
+    ///
+    /// - Throws: `EncodingError` for a payload that JSON can't hold.
     public func broadcast(topic: String, event: String, payload: ChannelPayload) async throws {
+        _ = try JSONValue(payload)
         let targets = lock.withLock {
             sockets[topic].map { Array($0.values) } ?? []
         }

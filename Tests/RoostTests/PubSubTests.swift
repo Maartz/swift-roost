@@ -181,6 +181,17 @@ struct PubSubJSONTests {
         #expect((decoded.payload["author"] as? [String: any Sendable])?["id"] as? Int == 7)
     }
 
+    @Test func nilOptionalsArriveMissing() throws {
+        let nickname: String? = nil
+        let message = PubSubMessage(topic: "room:1", event: "joined", payload: [
+            "nickname": nickname as any Sendable, "aliases": ["ada", nickname] as [any Sendable],
+        ])
+        let decoded = try PubSubMessage(json: message.json())
+        #expect(decoded.payload["nickname"] == nil)
+        let aliases = try #require(decoded.payload["aliases"] as? [any Sendable])
+        #expect(aliases.count == 2 && aliases.first as? String == "ada" && aliases.last as? String == nil)
+    }
+
     @Test func valuesOtherThanJSONAreRejected() {
         let message = PubSubMessage(topic: "room:1", event: "joined", payload: ["at": Date()])
         #expect(throws: EncodingError.self) { try message.json() }

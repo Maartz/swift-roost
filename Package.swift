@@ -46,6 +46,8 @@ let package = Package(
             url: "https://github.com/hummingbird-project/hummingbird.git",
             from: "2.0.0"
         ),
+        // Channel sockets.
+        .package(url: "https://github.com/hummingbird-project/hummingbird-websocket.git", from: "2.8.1"),
         .package(
             url: "https://github.com/apple/swift-crypto.git",
             from: "3.0.0"
@@ -93,6 +95,8 @@ let package = Package(
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "HummingbirdCore", package: "hummingbird"),
                 .product(name: "HummingbirdHTTP2", package: "hummingbird"),
+                .product(name: "HummingbirdTLS", package: "hummingbird"),
+                .product(name: "HummingbirdWebSocket", package: "hummingbird-websocket"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Metrics", package: "swift-metrics"),
                 .product(name: "Tracing", package: "swift-distributed-tracing"),
@@ -121,6 +125,9 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "InMemoryTracing", package: "swift-distributed-tracing"),
                 .product(name: "HummingbirdTesting", package: "hummingbird"),
+                .product(name: "HummingbirdWSTesting", package: "hummingbird-websocket"),
+                .product(name: "HummingbirdWSClient", package: "hummingbird-websocket"),
+                .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "PostgresNIO", package: "postgres-nio"),
                 .product(name: "Logging", package: "swift-log"),
             ]

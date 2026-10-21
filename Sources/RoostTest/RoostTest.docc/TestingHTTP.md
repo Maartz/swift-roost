@@ -84,7 +84,7 @@ The harness builds the real Roost request pipeline, including session
 finalization and response hooks, but skips listener startup. It does not
 execute browser JavaScript or validate socket upgrades over the network.
 
-`connectSocket` creates an in-process channel socket; it does not exercise the
-current HTTP upgrade stub. `collectSSE` subscribes before running its action and
+`connectSocket` creates an in-process channel socket; it does not open a
+WebSocket or call `authenticateSocket(_:)`. `collectSSE` subscribes before running its action and
 can collect a bounded number of events with a timeout. Network transport needs
 separate acceptance checks.

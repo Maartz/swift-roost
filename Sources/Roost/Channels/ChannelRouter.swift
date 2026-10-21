@@ -56,14 +56,19 @@ public struct ChannelRouteBuilder {
 /// }
 /// ```
 public struct ChannelRouter: Sendable {
+    /// Where clients connect, as with phoenix.js's `new Socket("/socket")`. The
+    /// WebSocket itself is at `path` followed by `/websocket`.
+    public let path: String
     let routes: [ChannelRoute]
 
-    public init(@ChannelRouteBuilder _ build: () -> [ChannelRoute]) {
+    public init(path: String = "/socket", @ChannelRouteBuilder _ build: () -> [ChannelRoute]) {
+        self.path = path
         self.routes = build()
     }
 
     /// Empty router — used as default when no channels are configured.
     public init() {
+        self.path = "/socket"
         self.routes = []
     }
 

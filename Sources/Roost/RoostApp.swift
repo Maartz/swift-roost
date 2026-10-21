@@ -230,11 +230,17 @@ extension RoostApp {
         }
 
         let adapter = NexusHummingbirdAdapter(plug: finalPlug)
+        let sockets = roost_channelSockets(
+            app, spectro: spectro, store: store.store, channels: channelRegistry, jobs: jobQueueAdapter,
+            pubSub: pubSubAdapter
+        )
         // Services stop in reverse order, after the server stops accepting requests:
         // the job workers finish before the PubSub and store connections close.
         let server = Application(
             responder: adapter,
-            server: serverBuilder,
+            // The socket runs the app's plugs, which need the database. The first
+            // builder has already checked the configuration.
+            server: try sockets.map { try config.serverBuilder(channels: $0) } ?? serverBuilder,
             configuration: .init(address: .hostname(config.host, port: config.port)),
             services: store.services + [pubSubAdapter as? any Service, postgresJobs].compactMap { $0 }
         )

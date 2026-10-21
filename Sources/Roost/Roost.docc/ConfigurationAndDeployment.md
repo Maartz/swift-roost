@@ -97,8 +97,9 @@ The memory session store does not survive restarts or span replicas. Use
 ``KeyValueSessionStore`` with a Valkey `ROOST_STORE_URL` before relying on
 persistent sessions. In production, an app whose key-value store fell back to
 memory logs a warning the first time it uses it.
-Likewise, inspect the implementation status of channels and mail in
-<doc:ProjectStatus> before depending on an external adapter. A
+Likewise, inspect the implementation status of mail in <doc:ProjectStatus>
+before depending on an external adapter. An app with channels needs a reverse
+proxy that passes WebSocket upgrades on; see <doc:Channels>. A
 ``PostgresJobQueue`` creates its tables at startup; see <doc:BackgroundJobs>
 before deploying new job types.
 

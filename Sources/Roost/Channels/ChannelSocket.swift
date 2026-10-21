@@ -38,7 +38,10 @@ public final class ChannelSocket: @unchecked Sendable {
     // MARK: - Send to this client only
 
     /// Pushes an event to this connected client only.
+    ///
+    /// - Throws: `EncodingError` for a payload that JSON can't hold.
     public func push(event: String, payload: ChannelPayload) async throws {
+        _ = try JSONValue(payload)
         deliverHandler(event, payload)
     }
 
@@ -50,12 +53,18 @@ public final class ChannelSocket: @unchecked Sendable {
     // MARK: - Broadcast
 
     /// Broadcasts an event to **all** subscribers on this socket's topic, including the sender.
+    ///
+    /// - Throws: `EncodingError` for a payload that JSON can't hold.
     public func broadcast(event: String, payload: ChannelPayload) async throws {
+        _ = try JSONValue(payload)
         try await registry?.deliver(topic: topic, event: event, payload: payload, from: self, excludeSender: false)
     }
 
     /// Broadcasts an event to all subscribers on this socket's topic, **excluding** the sender.
+    ///
+    /// - Throws: `EncodingError` for a payload that JSON can't hold.
     public func broadcastFrom(event: String, payload: ChannelPayload) async throws {
+        _ = try JSONValue(payload)
         try await registry?.deliver(topic: topic, event: event, payload: payload, from: self, excludeSender: true)
     }
 }

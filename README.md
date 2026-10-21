@@ -532,7 +532,8 @@ and PubSub, with different levels of implementation:
 
 - PubSub has in-memory and Valkey implementations. Jobs run in the background
   from PostgreSQL, through swift-jobs, or inline in memory.
-- Roost's channel upgrade route and SMTP delivery are stubs.
+- Channels accept Phoenix's JavaScript client over WebSocket. SMTP delivery is
+  a stub.
 
 The framework is now **Roost.** Existing apps should follow the
 [rename guide](guides/renaming-to-roost.md) for imports, environment variables,

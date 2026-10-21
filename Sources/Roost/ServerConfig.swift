@@ -1,12 +1,16 @@
 import Foundation
 import HummingbirdCore
 import HummingbirdHTTP2
+import HummingbirdTLS
+import HummingbirdWebSocket
 import NIOSSL
 
 /// Server binding settings and optional TLS.
 ///
 /// Without ``tls`` the server speaks HTTP/1.1. With it, the server speaks HTTPS
 /// and negotiates HTTP/2 with clients that support it, falling back to HTTP/1.1.
+/// An app with ``RoostApp/channels`` serves HTTPS over HTTP/1.1 only, because
+/// its WebSockets upgrade from HTTP/1.1 connections.
 ///
 /// ```swift
 /// var server: ServerConfig {
@@ -104,18 +108,28 @@ public struct ServerConfig: Sendable {
     }
 
     /// The Hummingbird server for this configuration: HTTP/1.1, or HTTPS that
-    /// negotiates HTTP/2 when ``tls`` is set.
+    /// negotiates HTTP/2 when ``tls`` is set. With `channels`, the server
+    /// upgrades their socket's requests to WebSockets, and speaks HTTP/1.1 only.
     ///
     /// - Throws: ``ServerConfigError`` when ``validate()`` finds a problem, or
     ///   NIOSSL's error when the certificate or key can't be parsed.
-    func serverBuilder() throws -> HTTPServerBuilder {
+    func serverBuilder(channels: ChannelSocketServer? = nil) throws -> HTTPServerBuilder {
         if let errors = validate() { throw ServerConfigError(messages: errors) }
-        guard let tls else { return .http1() }
+        let webSocket = channels.map { channels in
+            HTTPServerBuilder.http1WebSocketUpgrade(
+                configuration: .init(ws: .init(maxFrameSize: ChannelSocketServer.maxMessageSize))
+            ) { request, channel, logger in
+                try await channels.shouldUpgrade(request, channel: channel, logger: logger)
+            }
+        }
+        guard let tls else { return webSocket ?? .http1() }
         let certificates = try NIOSSLCertificate.fromPEMFile(tls.certificatePath).map(NIOSSLCertificateSource.certificate)
         let key = try NIOSSLPrivateKey(file: tls.keyPath, format: .pem)
-        return try .http2Upgrade(tlsConfiguration: .makeServerConfiguration(
+        let configuration = TLSConfiguration.makeServerConfiguration(
             certificateChain: certificates, privateKey: .privateKey(key)
-        ))
+        )
+        if let webSocket { return try .tls(webSocket, tlsConfiguration: configuration) }
+        return try .http2Upgrade(tlsConfiguration: configuration)
     }
 }
 

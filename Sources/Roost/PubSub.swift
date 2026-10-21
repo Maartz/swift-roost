@@ -34,14 +34,14 @@ extension PubSubMessage {
               case .object(let payload) = fields["payload"] else {
             throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Not a PubSub message"))
         }
-        self.init(topic: topic, event: event, payload: payload.mapValues(\.value))
+        self.init(topic: topic, event: event, payload: payload.compactMapValues(\.value))
     }
 }
 
 /// A JSON value that decodes to the Swift type it was encoded from, except
-/// that a whole `Double` comes back as an `Int`.
-private enum JSONValue: Codable {
-    case string(String), bool(Bool), int(Int), double(Double), array([JSONValue]), object([String: JSONValue])
+/// that a whole `Double` comes back as an `Int`, and `nil` as a missing key.
+enum JSONValue: Codable {
+    case string(String), bool(Bool), int(Int), double(Double), array([JSONValue]), object([String: JSONValue]), null
 
     init(_ value: any Sendable) throws {
         switch value {
@@ -51,26 +51,31 @@ private enum JSONValue: Codable {
         case let value as Double: self = .double(value)
         case let value as [any Sendable]: self = .array(try value.map(JSONValue.init))
         case let value as [String: any Sendable]: self = .object(try value.mapValues(JSONValue.init))
+        // An optional that holds a value matches its type above.
+        case _ where Mirror(reflecting: value).displayStyle == .optional: self = .null
         default:
             throw EncodingError.invalidValue(value, .init(codingPath: [], debugDescription:
-                "A PubSub payload holds strings, numbers, booleans, arrays, and dictionaries, not \(type(of: value))"))
+                "A payload holds strings, numbers, booleans, arrays, and dictionaries, not \(type(of: value))"))
         }
     }
 
-    var value: any Sendable {
+    /// The Swift value, or `nil` for `null`.
+    var value: (any Sendable)? {
         switch self {
         case .string(let value): value
         case .bool(let value): value
         case .int(let value): value
         case .double(let value): value
-        case .array(let values): values.map(\.value)
-        case .object(let values): values.mapValues(\.value)
+        case .array(let values): values.map { $0.value ?? String?.none }
+        case .object(let values): values.compactMapValues(\.value)
+        case .null: nil
         }
     }
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
-        if let value = try? container.decode(Bool.self) { self = .bool(value) }
+        if container.decodeNil() { self = .null }
+        else if let value = try? container.decode(Bool.self) { self = .bool(value) }
         else if let value = try? container.decode(Int.self) { self = .int(value) }
         else if let value = try? container.decode(Double.self) { self = .double(value) }
         else if let value = try? container.decode(String.self) { self = .string(value) }
@@ -87,6 +92,7 @@ private enum JSONValue: Codable {
         case .double(let value): try container.encode(value)
         case .array(let values): try container.encode(values)
         case .object(let values): try container.encode(values)
+        case .null: try container.encodeNil()
         }
     }
 }

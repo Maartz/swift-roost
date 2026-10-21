@@ -35,6 +35,17 @@
   `JobContext.spectro`, which was `nil` outside tests.
 - Roost requires macOS 15 or later on macOS, as swift-jobs does. Linux is
   unaffected.
+- Channels accept WebSockets at `ChannelRouter.path`, `/socket` by default, in
+  Phoenix's V2 protocol, so Phoenix's JavaScript client connects unchanged. An
+  upgrade runs the app's plugs, then `authenticateSocket(_:)`; a refused socket,
+  or one from a page on another site, gets a 400 response. Every client message
+  gets a reply, and a closed socket leaves its topics. A server with channels
+  serves HTTPS over HTTP/1.1 only.
+- Channel broadcasts and pushes throw `EncodingError` for a payload JSON can't
+  hold. PubSub and channel payloads can hold `nil` optionals, which arrive as
+  missing keys.
+- `channel(_:)` stays deprecated: the server upgrades channel sockets before
+  routing, so apps remove it from their routes.
 
 ### Upgrade
 

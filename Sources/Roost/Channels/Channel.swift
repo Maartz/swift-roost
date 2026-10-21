@@ -2,7 +2,9 @@ import Foundation
 
 // MARK: - Type aliases
 
-/// The payload type for all channel events.
+/// The payload type for all channel events. Clients receive it as JSON, so its
+/// values are strings, numbers, booleans, `nil` optionals, and arrays or
+/// string-keyed dictionaries of them.
 public typealias ChannelPayload = [String: any Sendable]
 
 /// Assigns attached to a socket at authentication time.

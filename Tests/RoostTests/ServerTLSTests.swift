@@ -36,7 +36,7 @@ struct ServerTLSTests {
 }
 
 // A self-signed certificate for localhost, valid until 2126. Test use only.
-private let localhostCertificate = """
+let localhostCertificate = """
     -----BEGIN CERTIFICATE-----
     MIIBlTCCATugAwIBAgIUKyCZLDwXrJY3LTEMvUMDupeT3k0wCgYIKoZIzj0EAwIw
     FDESMBAGA1UEAwwJbG9jYWxob3N0MCAXDTI2MTAyMDE3MDQxOFoYDzIxMjYwOTI2
@@ -50,7 +50,7 @@ private let localhostCertificate = """
     -----END CERTIFICATE-----
     """
 
-private let localhostKey = """
+let localhostKey = """
     -----BEGIN PRIVATE KEY-----
     MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgh0RtLNmeCi+E77hA
     r6+UD4D1oa3rkYRL1uLFtLCOP1OhRANCAASPh/IJtyTKzNx+P/ckM79gS47qlyjZ

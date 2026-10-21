@@ -32,8 +32,8 @@ does not run that check or establish production readiness.
 | PubSub | `InMemoryPubSub` delivers within one process; `ValkeyPubSub` delivers between servers with the `Valkey` trait. |
 | Jobs | `PostgresJobQueue` runs jobs in the background from the app's database, with retries and cron schedules; `InMemoryJobQueue` runs each job inside `push`. See <doc:BackgroundJobs>. |
 | Mail | Logger and test deliveries are available; SMTP delivery is a stub. |
-| Channels | In-process registry and test helpers exist; the HTTP upgrade route is a stub. |
-| TLS / HTTP/2 | `ServerConfig(tls:)` serves HTTPS and negotiates HTTP/2, falling back to HTTP/1.1. HTTP/2 without TLS is rejected at startup. |
+| Channels | Clients connect over WebSocket with Phoenix's JavaScript client. Broadcasts reach the sockets of one server. See <doc:Channels>. |
+| TLS / HTTP/2 | `ServerConfig(tls:)` serves HTTPS and negotiates HTTP/2, falling back to HTTP/1.1, except in an app with channels. HTTP/2 without TLS is rejected at startup. |
 | Live pages | `LivePage` and `LiveRoute` integrate ESWLive over SSE and POST, with session ownership, CSRF, reconnects, and shutdown. `broadcast(_:to:)` updates other open pages, on every server when the route has a PubSub. Page state is process-local; see <doc:LivePages>. |
 
 Reference pages include these public declarations so you can inspect their
