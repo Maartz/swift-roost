@@ -533,8 +533,6 @@ and PubSub, with different levels of implementation:
 - PubSub and jobs have in-memory implementations. The Valkey adapter and
   PostgreSQL job queue are unfinished.
 - Roost's channel upgrade route and SMTP delivery are stubs.
-- TLS and HTTP/2 configuration types exist, but Roost's bootstrap does not
-  wire them into the running server.
 
 The framework is now **Roost.** Existing apps should follow the
 [rename guide](guides/renaming-to-roost.md) for imports, environment variables,

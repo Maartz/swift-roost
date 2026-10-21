@@ -176,8 +176,10 @@ extension RoostApp {
             break
         }
 
-        // A store configuration error stops the app before it opens the database.
+        // A store or server configuration error stops the app before it opens the database.
         let store = try app.store.resolve(app: String(describing: Self.self), environment: Roost.env)
+        let config = app.server
+        let serverBuilder = try config.serverBuilder()
 
         // PubSub setup (call once to get a stable shared instance)
         let pubSubAdapter = app.pubSub
@@ -215,15 +217,15 @@ extension RoostApp {
         )
 
         // Boot server
-        let config = app.server
         if Roost.env != .test {
-            print("Roost running on http://\(config.host):\(config.port)")
+            print("Roost running on \(config.tls == nil ? "http" : "https")://\(config.host):\(config.port)")
         }
 
         let adapter = NexusHummingbirdAdapter(plug: finalPlug)
         // The server stops accepting requests before the store's connections close.
         let server = Application(
             responder: adapter,
+            server: serverBuilder,
             configuration: .init(address: .hostname(config.host, port: config.port)),
             services: store.services
         )

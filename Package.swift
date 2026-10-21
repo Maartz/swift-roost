@@ -86,12 +86,14 @@ let package = Package(
                 .product(name: "ESWLive", package: "esw"),
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
                 .product(name: "Hummingbird", package: "hummingbird"),
+                .product(name: "HummingbirdCore", package: "hummingbird"),
+                .product(name: "HummingbirdHTTP2", package: "hummingbird"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Metrics", package: "swift-metrics"),
                 .product(name: "Tracing", package: "swift-distributed-tracing"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Valkey", package: "valkey-swift", condition: .when(traits: ["Valkey"])),
-                .product(name: "NIOSSL", package: "swift-nio-ssl", condition: .when(traits: ["Valkey"])),
+                .product(name: "NIOSSL", package: "swift-nio-ssl"),
             ]
         ),
         .target(
@@ -109,6 +111,7 @@ let package = Package(
                 .product(name: "NexusTest", package: "Nexus"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "InMemoryTracing", package: "swift-distributed-tracing"),
+                .product(name: "HummingbirdTesting", package: "hummingbird"),
                 .product(name: "Logging", package: "swift-log"),
             ]
         ),

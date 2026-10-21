@@ -1,45 +1,37 @@
 import Foundation
+import HummingbirdCore
+import HummingbirdHTTP2
+import NIOSSL
 
-/// Server binding settings and optional transport configuration.
+/// Server binding settings and optional TLS.
 ///
-/// Roost's current bootstrap applies only `host` and `port`. The TLS and HTTP/2
-/// settings are deprecated because the running Hummingbird server doesn't use
-/// them; terminate TLS in a reverse proxy instead.
+/// Without ``tls`` the server speaks HTTP/1.1. With it, the server speaks HTTPS
+/// and negotiates HTTP/2 with clients that support it, falling back to HTTP/1.1.
+///
+/// ```swift
+/// var server: ServerConfig {
+///     ServerConfig(host: "0.0.0.0", port: 443, tls: .init(
+///         certificatePath: "/etc/ssl/app/fullchain.pem",
+///         keyPath: "/etc/ssl/app/privkey.pem"
+///     ))
+/// }
+/// ```
 public struct ServerConfig: Sendable {
     public let host: String
     public let port: Int
 
-    // The deprecated settings, stored without the deprecated types so the
-    // supported initializer doesn't use them.
-    private let certificatePath: String?
-    private let keyPath: String?
-    private let requestsHTTP2: Bool
+    /// The certificate and key the server uses for HTTPS, or `nil` for plain HTTP.
+    public let tls: TLSConfig?
 
-    /// Requested TLS configuration. Roost's bootstrap does not apply it yet.
-    @available(*, deprecated, message: """
-        Roost's bootstrap doesn't apply TLS or HTTP/2 settings; terminate TLS in a reverse proxy. \
-        Roost 3.0 removes them from the stable API until they are implemented.
-        """)
-    public var tls: TLSConfig? {
-        guard let certificatePath, let keyPath else { return nil }
-        return TLSConfig(certificatePath: certificatePath, keyPath: keyPath)
-    }
-
-    /// Requested HTTP/2 support. Setting `tls` also sets this value to `true`,
-    /// but Roost's bootstrap does not yet enable HTTP/2 on the running server.
-    @available(*, deprecated, message: """
-        Roost's bootstrap doesn't apply TLS or HTTP/2 settings; terminate TLS in a reverse proxy. \
-        Roost 3.0 removes them from the stable API until they are implemented.
-        """)
-    public var http2: Bool { requestsHTTP2 }
+    /// Whether the server negotiates HTTP/2. Setting ``tls`` turns it on.
+    /// HTTP/2 needs TLS: without it, ``validate()`` reports an error and the app
+    /// stops at startup.
+    public let http2: Bool
 
     /// TLS certificate and key pair.
-    @available(*, deprecated, message: """
-        Roost's bootstrap doesn't apply TLS or HTTP/2 settings; terminate TLS in a reverse proxy. \
-        Roost 3.0 removes them from the stable API until they are implemented.
-        """)
     public struct TLSConfig: Sendable {
-        /// Path to the PEM-encoded certificate file.
+        /// Path to the PEM-encoded certificate file. Put intermediate
+        /// certificates after the server's own, as in a `fullchain.pem`.
         public let certificatePath: String
         /// Path to the PEM-encoded private key file.
         public let keyPath: String
@@ -53,17 +45,9 @@ public struct ServerConfig: Sendable {
     // MARK: - Init
 
     public init(host: String = "127.0.0.1", port: Int = 8080) {
-        self.host = host
-        self.port = port
-        certificatePath = nil
-        keyPath = nil
-        requestsHTTP2 = false
+        self.init(host: host, port: port, tls: nil)
     }
 
-    @available(*, deprecated, message: """
-        Roost's bootstrap doesn't apply TLS or HTTP/2 settings; terminate TLS in a reverse proxy. \
-        Roost 3.0 removes them from the stable API until they are implemented.
-        """)
     public init(
         host: String = "127.0.0.1",
         port: Int = 8080,
@@ -72,15 +56,14 @@ public struct ServerConfig: Sendable {
     ) {
         self.host = host
         self.port = port
-        certificatePath = tls?.certificatePath
-        keyPath = tls?.keyPath
+        self.tls = tls
         // If TLS is configured, HTTP/2 is automatically enabled.
-        requestsHTTP2 = tls != nil ? true : http2
+        self.http2 = tls != nil ? true : http2
     }
 
     @available(*, deprecated, message: """
-        Roost's bootstrap doesn't apply TLS or HTTP/2 settings; terminate TLS in a reverse proxy. \
-        Roost 3.0 removes them from the stable API until they are implemented.
+        HTTP/2 needs TLS, so an app with this configuration stops at startup. \
+        Pass tls: to serve HTTPS with HTTP/2, or terminate TLS in a reverse proxy.
         """)
     public init(host: String = "127.0.0.1", port: Int = 8080, http2: Bool) {
         self.init(host: host, port: port, tls: nil, http2: http2)
@@ -100,24 +83,46 @@ public struct ServerConfig: Sendable {
 
     // MARK: - Validation
 
-    /// Validates that any configured TLS certificate and key files exist on
-    /// disk. Returns a descriptive error string on failure, or nil if valid.
-    @available(*, deprecated, message: """
-        validate() checks only the TLS files, which Roost's bootstrap doesn't use. \
-        Roost 3.0 removes it from the stable API until TLS is implemented.
-        """)
+    /// Checks that the configured TLS certificate and key files exist, and that
+    /// HTTP/2 isn't requested without TLS. Returns a descriptive error string for
+    /// each problem, or nil if the configuration is valid.
     public func validate() -> [String]? {
         var errors: [String] = []
 
-        if let certificatePath, let keyPath {
-            if !FileManager.default.fileExists(atPath: certificatePath) {
-                errors.append("TLS certificate file not found: \(certificatePath)")
+        if let tls {
+            if !FileManager.default.fileExists(atPath: tls.certificatePath) {
+                errors.append("TLS certificate file not found: \(tls.certificatePath)")
             }
-            if !FileManager.default.fileExists(atPath: keyPath) {
-                errors.append("TLS key file not found: \(keyPath)")
+            if !FileManager.default.fileExists(atPath: tls.keyPath) {
+                errors.append("TLS key file not found: \(tls.keyPath)")
             }
+        } else if http2 {
+            errors.append("HTTP/2 needs TLS: set tls, or terminate TLS in a reverse proxy")
         }
 
         return errors.isEmpty ? nil : errors
     }
+
+    /// The Hummingbird server for this configuration: HTTP/1.1, or HTTPS that
+    /// negotiates HTTP/2 when ``tls`` is set.
+    ///
+    /// - Throws: ``ServerConfigError`` when ``validate()`` finds a problem, or
+    ///   NIOSSL's error when the certificate or key can't be parsed.
+    func serverBuilder() throws -> HTTPServerBuilder {
+        if let errors = validate() { throw ServerConfigError(messages: errors) }
+        guard let tls else { return .http1() }
+        let certificates = try NIOSSLCertificate.fromPEMFile(tls.certificatePath).map(NIOSSLCertificateSource.certificate)
+        let key = try NIOSSLPrivateKey(file: tls.keyPath, format: .pem)
+        return try .http2Upgrade(tlsConfiguration: .makeServerConfiguration(
+            certificateChain: certificates, privateKey: .privateKey(key)
+        ))
+    }
+}
+
+/// A server configuration the app can't start with, such as a missing
+/// certificate file. Each message names one problem.
+public struct ServerConfigError: Error, Sendable, CustomStringConvertible {
+    public let messages: [String]
+
+    public var description: String { messages.joined(separator: "\n") }
 }

@@ -71,5 +71,4 @@ Playground has its own reload behavior.
 ### An API exists but its integration does not work
 
 Check <doc:ProjectStatus>. In particular, SMTP, the external PubSub and job
-adapters, and network channel upgrades remain incomplete. Server TLS and HTTP/2
-configuration is not yet applied during bootstrap.
+adapters, and network channel upgrades remain incomplete.

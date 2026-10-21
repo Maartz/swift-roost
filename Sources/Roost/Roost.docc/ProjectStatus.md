@@ -33,7 +33,7 @@ does not run that check or establish production readiness.
 | Jobs | In-memory queue is available; the PostgreSQL store is a stub. |
 | Mail | Logger and test deliveries are available; SMTP delivery is a stub. |
 | Channels | In-process registry and test helpers exist; the HTTP upgrade route is a stub. |
-| TLS / HTTP/2 | Configuration types exist; application bootstrap does not wire them into the server. |
+| TLS / HTTP/2 | `ServerConfig(tls:)` serves HTTPS and negotiates HTTP/2, falling back to HTTP/1.1. HTTP/2 without TLS is rejected at startup. |
 | Live pages | `LivePage` and `LiveRoute` integrate ESWLive over SSE and POST, with session ownership, CSRF, reconnects, and shutdown. State is process-local; see <doc:LivePages>. |
 
 Reference pages include these public declarations so you can inspect their
@@ -42,9 +42,9 @@ transport or storage adapter is complete.
 
 Roost 2.3 deprecates the stubs: `ValkeyPubSub` and `PubSub.valkey(url:)`,
 `JobQueue.postgres(spectro:)`, `PostgresJobStore`, `JobWorker`, `SMTPDelivery`,
-`channel(_:)`, and the TLS and HTTP/2 settings of ``ServerConfig``. Their
-deprecation warnings say what each one does instead. They remain through 2.x,
-and Roost 3.0 removes them from the stable API until they are implemented.
+and `channel(_:)`. Their deprecation warnings say what each one does instead.
+They remain through 2.x, and Roost 3.0 removes them from the stable API until
+they are implemented.
 
 ``DriftDetector`` compares schema snapshots, but the `roost` CLI has no command
 that runs it; call it from a test or a CI script.

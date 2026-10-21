@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- `ServerConfig(tls:)` serves HTTPS from a PEM certificate chain and key, and
+  negotiates HTTP/2 with clients that support it, falling back to HTTP/1.1.
+  `tls`, `http2`, `TLSConfig`, and `validate()` are no longer deprecated.
+- A missing certificate or key file, or HTTP/2 without TLS, stops the app at
+  startup with `ServerConfigError`, before it opens the database.
+  `ServerConfig(host:port:http2:)` stays deprecated: HTTP/2 needs TLS.
+
 ## 2.4.0 — 2026-10-21
 
 The app commands that roost-cli 3.0's `roost db` and `roost routes` run, and SQL

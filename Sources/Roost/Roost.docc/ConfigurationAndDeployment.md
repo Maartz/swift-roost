@@ -75,10 +75,23 @@ packages without additional framework checkouts in the build context.
 
 ### Understand server and storage boundaries
 
-``ServerConfig`` currently controls the running server's host and port. Its
-TLS and HTTP/2 fields are configuration data; bootstrap does not apply them to
-Hummingbird. Use a separately configured HTTPS terminator for a deployed app
-until that integration is implemented.
+``ServerConfig`` controls the running server's host, port, and TLS. Without
+TLS the server speaks HTTP/1.1, which suits an app behind an HTTPS terminator.
+To serve HTTPS directly, pass a PEM certificate chain and key; the server then
+negotiates HTTP/2 with clients that support it and falls back to HTTP/1.1:
+
+```swift
+var server: ServerConfig {
+    ServerConfig(host: "0.0.0.0", port: 443, tls: .init(
+        certificatePath: "/etc/ssl/app/fullchain.pem",
+        keyPath: "/etc/ssl/app/privkey.pem"
+    ))
+}
+```
+
+A missing certificate or key file, or HTTP/2 requested without TLS, stops the
+app at startup with ``ServerConfigError`` before it opens the database. The
+certificate is read once at startup, so restart the app after renewing it.
 
 The memory session store does not survive restarts or span replicas. Use
 ``KeyValueSessionStore`` with a Valkey `ROOST_STORE_URL` before relying on
