@@ -24,6 +24,14 @@
   with an error instead.
 - `LiveRoute(_:pubSub:)` sends broadcasts through a PubSub, so they update the
   pages open on every server. The page's `Info` must be `Codable`.
+- Roost requires macOS 15 or later on macOS, as swift-jobs does. Linux is
+  unaffected.
+
+### Upgrade
+
+On macOS, raise the app's platform to `.macOS(.v15)` in `Package.swift`.
+SwiftPM rejects a package that supports an older macOS than one of its
+dependencies.
 
 ## 2.4.0 — 2026-10-21
 

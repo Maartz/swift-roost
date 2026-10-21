@@ -19,7 +19,7 @@ func ecosystem(_ name: String, from version: Version,
 let package = Package(
     name: "swift-roost",
     platforms: [
-        .macOS(.v14),
+        .macOS(.v15),
     ],
     products: [
         .library(name: "Roost", targets: ["Roost"]),

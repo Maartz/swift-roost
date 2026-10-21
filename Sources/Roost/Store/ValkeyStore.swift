@@ -64,7 +64,6 @@ struct ValkeyURL: Equatable {
 
 #if Valkey
 /// A ``KeyValueStore`` on a Valkey or Redis server, through valkey-swift.
-@available(macOS 15, *)
 struct ValkeyKeyValueStore: KeyValueStore {
     let client: ValkeyClient
 

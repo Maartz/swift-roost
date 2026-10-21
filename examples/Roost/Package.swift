@@ -19,7 +19,7 @@ let eswDependency: Package.Dependency = eswPath.map {
 let package = Package(
     name: "RoostExample",
     platforms: [
-        .macOS(.v14),
+        .macOS(.v15),
     ],
     dependencies: [
         frameworkDependency,

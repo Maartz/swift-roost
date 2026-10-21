@@ -17,8 +17,7 @@ import Valkey
 /// var pubSub: (any RoostPubSub)? { Self.pubSub }
 /// ```
 ///
-/// It needs Roost's `Valkey` trait, and macOS 15 or later when running on
-/// macOS. Without them, the app stops at startup.
+/// It needs Roost's `Valkey` trait. Without it, the app stops at startup.
 ///
 /// Payloads travel as JSON: their values are strings, numbers, booleans, or
 /// arrays and string-keyed dictionaries of them, and a whole `Double` arrives
@@ -26,8 +25,11 @@ import Valkey
 /// A server receives the messages published while it's subscribed, so one
 /// that is disconnected from Valkey misses them.
 public final class ValkeyPubSub: RoostPubSub, Service, @unchecked Sendable {
-    /// The `ValkeyClient`, which needs the `Valkey` trait and macOS 15.
-    private let client: Result<any Sendable, any Error>
+    #if Valkey
+    private let client: Result<ValkeyClient, any Error>
+    #else
+    private let client: Result<Never, any Error>
+    #endif
     private let channel: String
     private let logger: Logger
     private let local = InMemoryPubSub()
@@ -41,12 +43,8 @@ public final class ValkeyPubSub: RoostPubSub, Service, @unchecked Sendable {
     ///   - logger: Logs lost subscriptions and messages that can't be decoded.
     public init(url: String, channel: String? = nil, logger: Logger = Logger(label: "roost.pubsub")) {
         #if Valkey
-        if #available(macOS 15, *) {
-            // The same connection settings as the key-value store.
-            client = Result { try ValkeyKeyValueStore(url: ValkeyURL(url), logger: logger).client }
-        } else {
-            client = .failure(KeyValueStoreError(.misconfigured, "ValkeyPubSub needs macOS 15 or later"))
-        }
+        // The same connection settings as the key-value store.
+        client = Result { try ValkeyKeyValueStore(url: ValkeyURL(url), logger: logger).client }
         #else
         client = .failure(KeyValueStoreError(.misconfigured, """
             ValkeyPubSub needs Roost's Valkey trait. Add it to the swift-roost dependency: \
@@ -73,7 +71,6 @@ public final class ValkeyPubSub: RoostPubSub, Service, @unchecked Sendable {
         let message = try PubSubMessage(topic: topic, event: event, payload: payload).json()
         #if Valkey
         let client = try client.get()
-        guard #available(macOS 15, *), let client = client as? ValkeyClient else { return }
         // A client that isn't running would wait for a connection forever.
         guard lock.withLock({ running }) else {
             throw KeyValueStoreError(.misconfigured, "ValkeyPubSub isn't running: return it from RoostApp.pubSub")
@@ -87,7 +84,6 @@ public final class ValkeyPubSub: RoostPubSub, Service, @unchecked Sendable {
     public func run() async throws {
         #if Valkey
         let client = try client.get()
-        guard #available(macOS 15, *), let client = client as? ValkeyClient else { return }
         lock.withLock { running = true }
         defer { lock.withLock { running = false } }
         // valkey-swift 1.5 stops the process when its client shuts down while a
@@ -103,7 +99,6 @@ public final class ValkeyPubSub: RoostPubSub, Service, @unchecked Sendable {
     }
 
     #if Valkey
-    @available(macOS 15, *)
     private func listen(_ client: ValkeyClient) async {
         while !Task.isCancelled {
             do {

@@ -40,7 +40,7 @@ public struct StoreConfiguration: Sendable {
     /// A Valkey or Redis server: `valkey://[user[:password]@]host[:port][/database]`,
     /// or `valkeys://` for TLS.
     ///
-    /// Needs Roost's `Valkey` trait, and macOS 15 or later when running on macOS:
+    /// Needs Roost's `Valkey` trait:
     ///
     /// ```swift
     /// .package(url: "https://github.com/roost-framework/swift-roost", from: "2.3.0",
@@ -88,7 +88,7 @@ extension StoreConfiguration {
     /// Builds the store at startup, before the server accepts requests.
     ///
     /// - Throws: ``KeyValueStoreError/Kind/misconfigured`` for an invalid URL,
-    ///   or a Valkey store without the `Valkey` trait or on macOS 14.
+    ///   or a Valkey store without the `Valkey` trait.
     func resolve(
         app: String,
         environment: Environment,
@@ -119,11 +119,8 @@ extension StoreConfiguration {
     private static func valkey(_ string: String, logger: Logger) throws -> ResolvedStore {
         let url = try ValkeyURL(string)
         #if Valkey
-        if #available(macOS 15, *) {
-            let store = try ValkeyKeyValueStore(url: url, logger: logger)
-            return ResolvedStore(store: store, services: [store.client])
-        }
-        throw KeyValueStoreError(.misconfigured, "A Valkey store needs macOS 15 or later")
+        let store = try ValkeyKeyValueStore(url: url, logger: logger)
+        return ResolvedStore(store: store, services: [store.client])
         #else
         _ = url
         throw KeyValueStoreError(.misconfigured, """

@@ -91,7 +91,7 @@ enum StoreBackend: String, Sendable, CaseIterable, CustomTestStringConvertible {
             try await body(NamespacedStore(base: MemoryKeyValueStore(), prefix: prefix))
         case .valkey:
             #if Valkey
-            guard #available(macOS 15, *), let url = Self.valkeyURL else { return }
+            guard let url = Self.valkeyURL else { return }
             let store = try ValkeyKeyValueStore(url: ValkeyURL(url), logger: Logger(label: "test.valkey"))
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask { await store.client.run() }
@@ -396,7 +396,6 @@ struct StoreConfigurationTests {
     #if Valkey
     @Test("ROOST_STORE_URL selects Valkey, which runs as a service")
     func valkeyFromEnvironment() throws {
-        guard #available(macOS 15, *) else { return }
         let resolved = try StoreConfiguration.environment
             .resolve(app: "App", environment: .prod, variables: ["ROOST_STORE_URL": "valkey://localhost:6390"])
         #expect((resolved.store as? NamespacedStore)?.base is ValkeyKeyValueStore)
@@ -561,7 +560,7 @@ struct KeyValueStoreRequestTests {
     @Test("On Valkey, sessions survive a restart",
           .enabled(if: StoreBackend.valkeyURL != nil))
     func survivesRestart() async throws {
-        guard #available(macOS 15, *), let url = StoreBackend.valkeyURL else { return }
+        guard let url = StoreBackend.valkeyURL else { return }
         let namespace = "roost-test:\(UUID().uuidString):"
         // Each run resolves the store as RoostApp.main() does and runs its client.
         func run<T: Sendable>(_ body: @Sendable (TestApp<StoreSessionApp>) async throws -> T) async throws -> T {

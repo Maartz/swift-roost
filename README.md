@@ -163,7 +163,7 @@ Its README walks through the generated code and the application-specific additio
 
 ### 1. Install the CLI
 
-You need Swift **6.3 or later**, macOS 14+ or Linux, and PostgreSQL with its client
+You need Swift **6.3 or later**, macOS 15+ or Linux, and PostgreSQL with its client
 tools for the database-backed example. On Debian/Ubuntu, install `zlib1g-dev` for
 Nexus. No Node.js toolchain is needed for the default Pico CSS setup.
 

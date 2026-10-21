@@ -118,8 +118,7 @@ Then set `ROOST_STORE_URL`:
 
 `redis://` and `rediss://` work the same way, with Redis 6.2 or later.
 Percent-encode special characters in a password, such as `%40` for `@`; error
-messages hide the credentials either way. On macOS, the Valkey client needs
-macOS 15 or later; Linux has no such requirement.
+messages hide the credentials either way.
 
 Roost connects when the server starts and closes the connections after the
 server stops accepting requests. If Valkey becomes unreachable or stops
