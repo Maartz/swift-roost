@@ -98,6 +98,7 @@ Its `./dev` and `./check` helpers own local setup and disposable test databases.
 | `gen resource Post title:string --json` | JSON resource. |
 | `gen resource Post title:string --both` | Both transports sharing one context. |
 | `gen resource Post title:string --model-only` | Model, context, migration, and input tests. |
+| `gen live Post title:string` | HTML resource whose index is a `LivePage`: list, validated create form, and delete without reloads. |
 | `gen migration add_post_index` | Empty SQL migration to fill in. |
 | `migrate up / down / status` | App-configured migration operations. |
 | `db setup` | Create the database, migrate it, and run `Seeds/<env>.sql` when it exists. |

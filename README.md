@@ -432,6 +432,7 @@ Run `roost <command> --help` for options.
 | `roost gen resource Post title:string --json`                 | Generate a JSON resource.                                                       |
 | `roost gen resource Post title:string --both --scope user_id` | Generate authenticated HTML and JSON controllers with ownership checks.         |
 | `roost gen resource Post title:string --model-only`           | Generate model, context, migration, and input tests.                            |
+| `roost gen live Post title:string`                            | Generate an HTML resource whose index is a live page, like `mix phx.gen.live`.  |
 | `roost gen migration add_post_index`                          | Create an empty SQL migration.                                                  |
 | `roost migrate up\|down\|status`                              | Apply, roll back, or inspect migrations using the app's database configuration. |
 | `roost db setup`                                              | Create the database, migrate it, and run `Seeds/<env>.sql` when it exists.      |
