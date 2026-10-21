@@ -152,10 +152,22 @@ jobs:
       DB_PASSWORD: postgres
     steps:
       - uses: actions/checkout@v4
+      # A change that needs the CLI too has a roost-cli branch of the same name.
+      - name: Choose the roost CLI branch
+        id: cli
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/roost-framework/roost-cli.git "$BRANCH" >/dev/null; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
       - name: Check out the roost CLI
         uses: actions/checkout@v4
         with:
           repository: roost-framework/roost-cli
+          ref: ${{ steps.cli.outputs.ref }}
           path: roost-cli
       - name: Import Swift signing keys
         run: curl --fail --silent --show-error --location --compressed --retry 3 https://www.swift.org/keys/all-keys.asc | gpg --batch --import
