@@ -107,7 +107,7 @@ RoostExample.readingQueue.broadcast(.changed, to: "bookmarks:\(reader.userID)")
 `topics` runs when the page is rendered, with that request. `handleInfo` receives
 the request of the page's open stream, with its repository and authenticated
 scope, and the page's new render streams to its browser. Messages are Swift
-values, never serialized. A browser can't send one: the event that carries a
+values, serialized only to reach other servers. A browser can't send one: the event that carries a
 message is rejected when it comes from a browser.
 
 `broadcast` returns without waiting for the pages. The page whose handler
@@ -116,9 +116,23 @@ new state. Each other page handles the message in turn with its own events. An
 event its browser sent before the new render arrived is rejected as stale: the
 client shows an error and resynchronizes, and the reader repeats the action.
 
-Delivery stays within this process and reaches only pages with an open stream.
-A disconnected page misses the message and keeps its previous state when it
-reconnects, because reconnection doesn't mount the page again.
+Delivery reaches only pages with an open stream. A disconnected page misses the
+message and keeps its previous state when it reconnects, because reconnection
+doesn't mount the page again.
+
+Delivery stays within this process, unless the route has a PubSub. To update the
+pages open on every server, make `Info` `Codable` and create the route with the
+app's PubSub, such as a ``ValkeyPubSub``:
+
+```swift
+static let pubSub = PubSub.valkey(url: "valkey://cache.internal:6379")
+static let readingQueue = LiveRoute(BookmarksLive(), path: "/_live/bookmarks", pubSub: pubSub)
+
+var pubSub: (any RoostPubSub)? { Self.pubSub }
+```
+
+Messages then travel as JSON. A server drops a message its `Info` can't decode,
+such as during a rolling deploy that changes `Info`.
 
 ## Templates and browser behavior
 
@@ -171,4 +185,5 @@ one hour and capacity of 1,000 instances per route. They don't survive a server
 restart. A multi-process deployment needs affinity for live requests; putting
 ordinary sessions in Valkey does not distribute live state. This integration
 uses ESW's protocol, with bounded queues and heartbeat writes, and does not
-implement Phoenix wire compatibility. Broadcasts reach pages in the same process only.
+implement Phoenix wire compatibility. Broadcasts reach other servers only
+through a PubSub.

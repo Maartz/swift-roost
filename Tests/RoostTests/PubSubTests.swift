@@ -160,3 +160,29 @@ struct PubSubTests {
         }
     }
 }
+
+@Suite("PubSub messages as JSON")
+struct PubSubJSONTests {
+    @Test func messagesKeepTheirValueTypes() throws {
+        let message = PubSubMessage(topic: "room:1", event: "new_message", payload: [
+            "body": "hi", "count": 3, "ratio": 1.5, "read": true,
+            "tags": ["a", 2] as [any Sendable], "author": ["id": 7] as [String: any Sendable],
+        ])
+        let decoded = try PubSubMessage(json: message.json())
+        #expect(decoded.topic == "room:1")
+        #expect(decoded.event == "new_message")
+        #expect(decoded.payload["body"] as? String == "hi")
+        #expect(decoded.payload["count"] as? Int == 3)
+        #expect(decoded.payload["ratio"] as? Double == 1.5)
+        #expect(decoded.payload["read"] as? Bool == true)
+        let tags = try #require(decoded.payload["tags"] as? [any Sendable])
+        #expect(tags.first as? String == "a")
+        #expect(tags.last as? Int == 2)
+        #expect((decoded.payload["author"] as? [String: any Sendable])?["id"] as? Int == 7)
+    }
+
+    @Test func valuesOtherThanJSONAreRejected() {
+        let message = PubSubMessage(topic: "room:1", event: "joined", payload: ["at": Date()])
+        #expect(throws: EncodingError.self) { try message.json() }
+    }
+}

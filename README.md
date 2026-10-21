@@ -530,8 +530,8 @@ The main verified path is a PostgreSQL-backed application with authenticated
 HTML and JSON resources. Additional APIs exist for SSE, channels, jobs, mail,
 and PubSub, with different levels of implementation:
 
-- PubSub and jobs have in-memory implementations. The Valkey adapter and
-  PostgreSQL job queue are unfinished.
+- PubSub has in-memory and Valkey implementations. Jobs have an in-memory
+  queue; the PostgreSQL job queue is unfinished.
 - Roost's channel upgrade route and SMTP delivery are stubs.
 
 The framework is now **Roost.** Existing apps should follow the

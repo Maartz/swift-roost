@@ -68,7 +68,7 @@ jobs:
           swift-version: "6.3.3"
       - name: Install Linux system dependencies
         run: sudo apt-get update && sudo apt-get install -y zlib1g-dev
-      - name: Test the key-value store against Valkey
+      - name: Test the key-value store and PubSub against Valkey
         run: swift test --traits Valkey
 
   # Runs ScopedRepo's SQL and the example's migrations against a real database.

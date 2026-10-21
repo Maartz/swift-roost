@@ -14,18 +14,27 @@ public struct LiveRoute<View: Interactive>: Sendable, Service {
     private let view: View
     private let lifetime: Duration
     private let listeners = LiveListeners()
+    /// Publishes a broadcast through the PubSub the route was created with.
+    private let relay: (@Sendable (_ info: any Sendable, _ topic: String, _ sender: String?) async throws -> Void)?
     private let authorize: @Sendable (Connection) async throws -> Void
     private static var ownerKey: String { "_roost_live_owner" }
 
     public init(_ view: View, path: String = "/_live", capacity: Int = 1_000,
                 lifetime: Duration = .seconds(3_600),
                 authorize: @escaping @Sendable (Connection) async throws -> Void = { _ in }) {
+        self.init(view, path: path, capacity: capacity, lifetime: lifetime, relay: nil, authorize: authorize)
+    }
+
+    private init(_ view: View, path: String, capacity: Int, lifetime: Duration,
+                 relay: (@Sendable (any Sendable, String, String?) async throws -> Void)?,
+                 authorize: @escaping @Sendable (Connection) async throws -> Void) {
         precondition(path.hasPrefix("/") && !path.hasPrefix("//") && !path.hasSuffix("/")
             && !path.contains(where: { $0.isWhitespace || "?#\\:%".contains($0) }))
         self.host = LiveHost(view, capacity: capacity, lifetime: lifetime)
         self.path = path
         self.view = view
         self.lifetime = lifetime
+        self.relay = relay
         self.authorize = authorize
     }
 
@@ -162,10 +171,23 @@ extension LiveRoute where View: LivePage {
     ///
     /// The page whose handler broadcasts doesn't receive the message: its handler
     /// already returns its new state. Returns without waiting for the other pages.
-    /// Delivery stays within this process. A page whose stream is closed misses
-    /// the message and keeps its state when it reconnects.
+    /// Delivery stays within this process, unless the route was created with a
+    /// `pubSub`. A page whose stream is closed misses the message and keeps its
+    /// state when it reconnects.
     public func broadcast(_ info: View.Info, to topic: String) {
         let sender = LiveRequest.instance
+        guard let relay else { return deliver(info, to: topic, except: sender) }
+        Task {
+            do { try await relay(info, topic, sender) }
+            catch {
+                Logger(label: "roost.live").error("Live page couldn't publish a broadcast", metadata: [
+                    "topic": .string(topic), "error": .string(String(describing: error)),
+                ])
+            }
+        }
+    }
+
+    fileprivate func deliver(_ info: View.Info, to topic: String, except sender: String?) {
         for (id, conn) in listeners.streams(listeningTo: topic) where id != sender {
             Task {
                 do {
@@ -185,6 +207,42 @@ extension LiveRoute where View: LivePage {
                     ])
                 }
             }
+        }
+    }
+}
+
+extension LiveRoute where View: LivePage, View.Info: Codable {
+    /// A route whose broadcasts go through `pubSub`, so they reach the pages
+    /// open on every server that shares it, such as servers sharing a
+    /// ``ValkeyPubSub``. Return the same instance from ``RoostApp/pubSub``, so
+    /// the app runs it.
+    ///
+    /// ```swift
+    /// static let pubSub = PubSub.valkey(url: "valkey://cache.internal:6379")
+    /// static let readingQueue = LiveRoute(BookmarksLive(), pubSub: pubSub)
+    /// ```
+    ///
+    /// Each message is JSON-encoded, so servers running different versions of
+    /// `Info` drop the messages they can't decode.
+    public init(_ view: View, path: String = "/_live", capacity: Int = 1_000,
+                lifetime: Duration = .seconds(3_600), pubSub: any RoostPubSub,
+                authorize: @escaping @Sendable (Connection) async throws -> Void = { _ in }) {
+        let channel = "roost.live:\(path)"
+        self.init(view, path: path, capacity: capacity, lifetime: lifetime, relay: { info, topic, sender in
+            let json = try JSONEncoder().encode(info as! View.Info)
+            try await pubSub.broadcast(channel, event: "info", payload: [
+                "topic": topic, "info": String(decoding: json, as: UTF8.self), "sender": sender ?? "",
+            ])
+        }, authorize: authorize)
+        pubSub.subscribe(channel) { [self] message in
+            guard let topic = message.payload["topic"] as? String,
+                  let json = message.payload["info"] as? String,
+                  let sender = message.payload["sender"] as? String,
+                  let info = try? JSONDecoder().decode(View.Info.self, from: Data(json.utf8)) else {
+                Logger(label: "roost.live").error("Live page couldn't decode a broadcast", metadata: ["channel": .string(channel)])
+                return
+            }
+            deliver(info, to: topic, except: sender)
         }
     }
 }

@@ -16,6 +16,14 @@
   unchanged.
 - The bookmarks example broadcasts after every write, so a reader's other tabs
   update without reloading.
+- `ValkeyPubSub` delivers PubSub messages between servers through a Valkey or
+  Redis server, with the `Valkey` trait. Return it from `RoostApp.pubSub`, which
+  now runs an adapter that conforms to `Service` with the server. Payloads
+  travel as JSON. Without the trait, `ValkeyPubSub` and `PubSub.valkey(url:)` are
+  no longer deprecated stubs that stop the process: the app stops at startup
+  with an error instead.
+- `LiveRoute(_:pubSub:)` sends broadcasts through a PubSub, so they update the
+  pages open on every server. The page's `Info` must be `Codable`.
 
 ## 2.4.0 — 2026-10-21
 

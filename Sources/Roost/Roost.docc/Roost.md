@@ -108,6 +108,7 @@ for the current implementation boundaries.
 - ``SSEBroadcaster``
 - ``RoostPubSub``
 - ``InMemoryPubSub``
+- ``ValkeyPubSub``
 - ``RoostJob``
 - ``InMemoryJobQueue``
 - ``Email``

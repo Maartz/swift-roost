@@ -17,6 +17,80 @@ public struct PubSubMessage: Sendable {
     public let payload: [String: any Sendable]
 }
 
+// MARK: - JSON
+
+extension PubSubMessage {
+    /// The message as JSON, for an adapter that sends it to other servers.
+    ///
+    /// - Throws: `EncodingError` for a payload value other than a string,
+    ///   number, boolean, or an array or string-keyed dictionary of them.
+    func json() throws -> Data {
+        try JSONEncoder().encode(["topic": JSONValue.string(topic), "event": .string(event), "payload": JSONValue(payload)])
+    }
+
+    init(json: Data) throws {
+        let fields = try JSONDecoder().decode([String: JSONValue].self, from: json)
+        guard case .string(let topic) = fields["topic"], case .string(let event) = fields["event"],
+              case .object(let payload) = fields["payload"] else {
+            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Not a PubSub message"))
+        }
+        self.init(topic: topic, event: event, payload: payload.mapValues(\.value))
+    }
+}
+
+/// A JSON value that decodes to the Swift type it was encoded from, except
+/// that a whole `Double` comes back as an `Int`.
+private enum JSONValue: Codable {
+    case string(String), bool(Bool), int(Int), double(Double), array([JSONValue]), object([String: JSONValue])
+
+    init(_ value: any Sendable) throws {
+        switch value {
+        case let value as String: self = .string(value)
+        case let value as Bool: self = .bool(value)
+        case let value as Int: self = .int(value)
+        case let value as Double: self = .double(value)
+        case let value as [any Sendable]: self = .array(try value.map(JSONValue.init))
+        case let value as [String: any Sendable]: self = .object(try value.mapValues(JSONValue.init))
+        default:
+            throw EncodingError.invalidValue(value, .init(codingPath: [], debugDescription:
+                "A PubSub payload holds strings, numbers, booleans, arrays, and dictionaries, not \(type(of: value))"))
+        }
+    }
+
+    var value: any Sendable {
+        switch self {
+        case .string(let value): value
+        case .bool(let value): value
+        case .int(let value): value
+        case .double(let value): value
+        case .array(let values): values.map(\.value)
+        case .object(let values): values.mapValues(\.value)
+        }
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let value = try? container.decode(Bool.self) { self = .bool(value) }
+        else if let value = try? container.decode(Int.self) { self = .int(value) }
+        else if let value = try? container.decode(Double.self) { self = .double(value) }
+        else if let value = try? container.decode(String.self) { self = .string(value) }
+        else if let values = try? container.decode([JSONValue].self) { self = .array(values) }
+        else { self = .object(try container.decode([String: JSONValue].self)) }
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .string(let value): try container.encode(value)
+        case .bool(let value): try container.encode(value)
+        case .int(let value): try container.encode(value)
+        case .double(let value): try container.encode(value)
+        case .array(let values): try container.encode(values)
+        case .object(let values): try container.encode(values)
+        }
+    }
+}
+
 // MARK: - RoostPubSub
 
 /// The interface implemented by all PubSub adapters.
@@ -80,56 +154,19 @@ public final class InMemoryPubSub: RoostPubSub, @unchecked Sendable {
     }
 }
 
-// MARK: - ValkeyPubSub (stub)
-
-/// Distributed PubSub adapter backed by Valkey PUBLISH/SUBSCRIBE.
-///
-/// - Note: Not yet implemented. Add a valkey-swift client to `Package.swift` first.
-@available(*, deprecated, message: "ValkeyPubSub isn't implemented: each method stops the process. Use PubSub.inMemory(). Roost 3.0 removes it from the stable API until it is implemented.")
-public final class ValkeyPubSub: RoostPubSub, @unchecked Sendable {
-
-    private let url: String
-
-    public init(url: String) {
-        self.url = url
-    }
-
-    @discardableResult
-    public func subscribe(
-        _ topic: String,
-        handler: @escaping @Sendable (PubSubMessage) async -> Void
-    ) -> SubscriptionToken {
-        fatalError("ValkeyPubSub is not yet implemented. Add valkey-swift to Package.swift.")
-    }
-
-    public func broadcast(_ topic: String, event: String, payload: [String: any Sendable]) async throws {
-        fatalError("ValkeyPubSub is not yet implemented. Add valkey-swift to Package.swift.")
-    }
-
-    public func unsubscribe(_ token: SubscriptionToken) {
-        fatalError("ValkeyPubSub is not yet implemented. Add valkey-swift to Package.swift.")
-    }
-}
-
 // MARK: - PubSub factory
 
 /// Factory for PubSub adapters.
 ///
 /// ```swift
-/// // Dev / test
+/// // One process, such as in development and tests
 /// PubSub.inMemory()
 ///
+/// // Several servers, with Roost's Valkey trait
+/// PubSub.valkey(url: "valkey://cache.internal:6379")
 /// ```
-///
-/// Only the in-memory adapter is implemented, so subscribers must run in the
-/// same process as the broadcaster.
 public enum PubSub {
     public static func inMemory() -> InMemoryPubSub {
         InMemoryPubSub()
-    }
-
-    @available(*, deprecated, message: "ValkeyPubSub isn't implemented: each method stops the process. Use PubSub.inMemory(). Roost 3.0 removes it from the stable API until it is implemented.")
-    public static func valkey(url: String) -> ValkeyPubSub {
-        ValkeyPubSub(url: url)
     }
 }

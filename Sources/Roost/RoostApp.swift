@@ -53,7 +53,9 @@ public protocol RoostApp {
     var layout: HTMLLayout? { get }
 
     /// PubSub adapter. Return `nil` for apps that don't need pub/sub.
-    /// Default: `nil`. Override to use `PubSub.inMemory()`, which delivers within one process.
+    /// Default: `nil`. Override to use `PubSub.inMemory()`, which delivers within
+    /// one process, or ``ValkeyPubSub``, which delivers between servers. An
+    /// adapter that conforms to `Service` runs with the server.
     var pubSub: (any RoostPubSub)? { get }
 
     /// Channel router. Map topic patterns to `Channel` handler types.
@@ -222,12 +224,12 @@ extension RoostApp {
         }
 
         let adapter = NexusHummingbirdAdapter(plug: finalPlug)
-        // The server stops accepting requests before the store's connections close.
+        // The server stops accepting requests before the store and PubSub connections close.
         let server = Application(
             responder: adapter,
             server: serverBuilder,
             configuration: .init(address: .hostname(config.host, port: config.port)),
-            services: store.services
+            services: store.services + [pubSubAdapter as? any Service].compactMap { $0 }
         )
 
         do {

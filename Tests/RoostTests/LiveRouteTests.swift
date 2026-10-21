@@ -159,7 +159,7 @@ struct LiveRouteTests {
     }
 
     private struct Room: LivePage {
-        enum Info: Sendable { case said(String) }
+        enum Info: Sendable, Codable { case said(String) }
         var route = RoomRoute()
         func mount(_ conn: Connection, context: LiveContext) async throws -> [String] { [] }
         func handleEvent(_ event: LiveEvent, state: [String], conn: Connection) async throws -> [String] {
@@ -217,9 +217,52 @@ struct LiveRouteTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func aPageThatBroadcastsDoesNotReceiveItsOwnMessage() async throws {
+    func pubSubCarriesBroadcastsToThePagesOfAnotherServer() async throws {
+        let pubSub = PubSub.inMemory()
+        let first = LiveRoute(Room(), pubSub: pubSub)
+        let second = LiveRoute(Room(), pubSub: pubSub)
+        var (_, packets, streaming) = try await lobby(second, probe: "second server")
+
+        first.broadcast(.said("hello"), to: "room:lobby")
+        #expect(await next(&packets, containing: "hello").contains("hello via second server"))
+
+        await first.shutdown()
+        await second.shutdown()
+        try await streaming.value
+    }
+
+    #if Valkey
+    @Test(.timeLimit(.minutes(1)), .enabled(if: StoreBackend.valkeyURL != nil))
+    func valkeyCarriesBroadcastsToThePagesOfAnotherServer() async throws {
+        guard let url = StoreBackend.valkeyURL else { return }
+        let channel = "roost-test:\(UUID().uuidString)"
+        let servers = [PubSub.valkey(url: url, channel: channel), PubSub.valkey(url: url, channel: channel)]
+        let first = LiveRoute(Room(), pubSub: servers[0])
+        let second = LiveRoute(Room(), pubSub: servers[1])
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for server in servers { group.addTask { try await server.run() } }
+            defer { group.cancelAll() }
+            var (_, packets, streaming) = try await lobby(second, probe: "second server")
+            // Broadcasts until the second server has subscribed.
+            let broadcasting = Task {
+                while !Task.isCancelled {
+                    first.broadcast(.said("hello"), to: "room:lobby")
+                    try await Task.sleep(for: .milliseconds(100))
+                }
+            }
+            defer { broadcasting.cancel() }
+            #expect(await next(&packets, containing: "hello").contains("hello via second server"))
+            await first.shutdown()
+            await second.shutdown()
+            try await streaming.value
+        }
+    }
+    #endif
+
+    @Test(.timeLimit(.minutes(1)), arguments: [false, true])
+    func aPageThatBroadcastsDoesNotReceiveItsOwnMessage(throughPubSub: Bool) async throws {
         let room = Room()
-        let live = LiveRoute(room)
+        let live = throughPubSub ? LiveRoute(room, pubSub: PubSub.inMemory()) : LiveRoute(room)
         room.route.live = live
         var speaker = try await lobby(live, probe: "speaker")
         var listener = try await lobby(live, probe: "listener")

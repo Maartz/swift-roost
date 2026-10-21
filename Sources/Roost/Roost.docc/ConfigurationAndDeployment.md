@@ -97,8 +97,30 @@ The memory session store does not survive restarts or span replicas. Use
 ``KeyValueSessionStore`` with a Valkey `ROOST_STORE_URL` before relying on
 persistent sessions. In production, an app whose key-value store fell back to
 memory logs a warning the first time it uses it.
-Likewise, inspect the implementation status of channels, jobs, mail, and
-PubSub in <doc:ProjectStatus> before depending on an external adapter.
+Likewise, inspect the implementation status of channels, jobs, and mail in
+<doc:ProjectStatus> before depending on an external adapter.
+
+### Share PubSub between servers
+
+``InMemoryPubSub`` delivers messages within one process. ``ValkeyPubSub``
+delivers them between the servers that share a Valkey or Redis server. Like a
+Valkey store, it needs Roost's `Valkey` trait. Keep one instance in a static
+property, so live routes can share it, and return it from ``RoostApp/pubSub``,
+so it runs with the server:
+
+```swift
+// Valkey when PUBSUB_URL is set, such as in production; memory otherwise.
+static let pubSub: any RoostPubSub = ProcessInfo.processInfo.environment["PUBSUB_URL"]
+    .map { PubSub.valkey(url: $0) } ?? PubSub.inMemory()
+
+var pubSub: (any RoostPubSub)? { Self.pubSub }
+```
+
+Servers share messages through one Valkey channel, named after the executable
+and environment by default, such as `ReadingRoom:prod:pubsub`. Payload values
+must be JSON: strings, numbers, booleans, arrays, and dictionaries. A server
+disconnected from Valkey misses the messages published meanwhile, and
+subscribes again once it reconnects.
 
 ### Run startup work deliberately
 

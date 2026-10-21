@@ -29,19 +29,18 @@ does not run that check or establish production readiness.
 | --- | --- |
 | Key-value store | Memory and Valkey stores work; Valkey needs the `Valkey` trait. Hummingbird persist drivers can back it, without atomic counters. |
 | Sessions | `KeyValueSessionStore` persists sessions in the key-value store; `MemorySessionStore` works within one process. |
-| PubSub | In-memory implementation is available; the Valkey adapter is unfinished. |
+| PubSub | `InMemoryPubSub` delivers within one process; `ValkeyPubSub` delivers between servers with the `Valkey` trait. |
 | Jobs | In-memory queue is available; the PostgreSQL store is a stub. |
 | Mail | Logger and test deliveries are available; SMTP delivery is a stub. |
 | Channels | In-process registry and test helpers exist; the HTTP upgrade route is a stub. |
 | TLS / HTTP/2 | `ServerConfig(tls:)` serves HTTPS and negotiates HTTP/2, falling back to HTTP/1.1. HTTP/2 without TLS is rejected at startup. |
-| Live pages | `LivePage` and `LiveRoute` integrate ESWLive over SSE and POST, with session ownership, CSRF, reconnects, and shutdown. `broadcast(_:to:)` updates other open pages. State and broadcasts are process-local; see <doc:LivePages>. |
+| Live pages | `LivePage` and `LiveRoute` integrate ESWLive over SSE and POST, with session ownership, CSRF, reconnects, and shutdown. `broadcast(_:to:)` updates other open pages, on every server when the route has a PubSub. Page state is process-local; see <doc:LivePages>. |
 
 Reference pages include these public declarations so you can inspect their
 contracts. Their presence in the navigator does not mean their external
 transport or storage adapter is complete.
 
-Roost 2.3 deprecates the stubs: `ValkeyPubSub` and `PubSub.valkey(url:)`,
-`JobQueue.postgres(spectro:)`, `PostgresJobStore`, `JobWorker`, `SMTPDelivery`,
+Roost 2.3 deprecates the stubs: `JobQueue.postgres(spectro:)`, `PostgresJobStore`, `JobWorker`, `SMTPDelivery`,
 and `channel(_:)`. Their deprecation warnings say what each one does instead.
 They remain through 2.x, and Roost 3.0 removes them from the stable API until
 they are implemented.
