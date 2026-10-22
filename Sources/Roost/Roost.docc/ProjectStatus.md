@@ -41,9 +41,10 @@ contracts. Their presence in the navigator does not mean their external
 transport or storage adapter is complete.
 
 Roost 2.3 deprecates the stubs: `JobQueue.postgres(spectro:)`, `PostgresJobStore`, `JobWorker`, `SMTPDelivery`,
-and `channel(_:)`. Their deprecation warnings say what each one does instead.
-They remain through 2.x, and Roost 3.0 removes them from the stable API until
-they are implemented.
+and `channel(_:)`. Their deprecation warnings say what to use instead:
+``PostgresJobQueue`` runs jobs, and the server upgrades channel sockets without
+a route. They remain through 2.x, and Roost 3.0 removes them. SMTP delivery
+stays out of the stable API until it is implemented.
 
 ``DriftDetector`` compares schema snapshots, but the `roost` CLI has no command
 that runs it; call it from a test or a CI script.
