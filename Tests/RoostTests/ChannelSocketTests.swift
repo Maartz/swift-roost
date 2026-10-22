@@ -4,7 +4,9 @@ import HummingbirdTesting
 import HummingbirdWSClient
 import HummingbirdWSTesting
 import Logging
+import NIOPosix
 import NIOSSL
+import ServiceLifecycle
 import Testing
 
 @testable import Roost
@@ -16,6 +18,8 @@ private final class Departures: @unchecked Sendable {
     private var users: [String] = []
 
     func record(_ user: String) { lock.withLock { users.append(user) } }
+
+    func contains(_ user: String) -> Bool { lock.withLock { users.contains(user) } }
 
     func wait(for user: String) async throws {
         while !lock.withLock({ users.contains(user) }) { try await Task.sleep(for: .milliseconds(20)) }
@@ -367,6 +371,40 @@ struct ChannelSocketTests {
                 let joined = try await phoenix.join("room:lobby", ref: "1")
                 #expect(joined.status == "ok")
             }
+        }
+    }
+
+    @Test func anUnusedConnectionDoesntKeepTheServerRunning() async throws {
+        let app = SocketApp()
+        let registry = ChannelRegistry(router: app.channels)
+        let sockets = try #require(roost_channelSockets(
+            app, spectro: nil, store: MemoryKeyValueStore(), channels: registry, jobs: nil, pubSub: nil))
+        let (ports, listening) = AsyncStream.makeStream(of: Int.self)
+        let server = Application(
+            responder: NexusHummingbirdAdapter(plug: { conn in conn.text("ok") }),
+            server: try ServerConfig(host: "127.0.0.1", port: 0).serverBuilder(channels: sockets),
+            configuration: .init(address: .hostname("127.0.0.1", port: 0)),
+            onServerRunning: { listening.yield($0.localAddress?.port ?? 0) }
+        )
+        let services = ServiceGroup(configuration: .init(services: [server], logger: Logger(label: "test")))
+        let stopped = Departures()
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                try await services.run()
+                stopped.record("server")
+            }
+            var iterator = ports.makeAsyncIterator()
+            let port = try #require(await iterator.next())
+            // Like a browser's preconnect: a connection that hasn't sent a request.
+            let unused = try await ClientBootstrap(group: MultiThreadedEventLoopGroup.singleton)
+                .connect(host: "127.0.0.1", port: port).get()
+            try await Task.sleep(for: .milliseconds(200))  // Gives the server time to accept it.
+            await services.triggerGracefulShutdown()
+            let deadline = ContinuousClock.now + .seconds(5)
+            while !stopped.contains("server"), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+            #expect(stopped.contains("server"))
+            // Lets a server that's still waiting for the connection stop.
+            try? await unused.close()
         }
     }
 

@@ -3,6 +3,8 @@ import HummingbirdCore
 import HummingbirdHTTP2
 import HummingbirdTLS
 import HummingbirdWebSocket
+import Logging
+import NIOCore
 import NIOSSL
 
 /// Server binding settings and optional TLS.
@@ -116,10 +118,13 @@ public struct ServerConfig: Sendable {
     func serverBuilder(channels: ChannelSocketServer? = nil) throws -> HTTPServerBuilder {
         if let errors = validate() { throw ServerConfigError(messages: errors) }
         let webSocket = channels.map { channels in
-            HTTPServerBuilder.http1WebSocketUpgrade(
-                configuration: .init(ws: .init(maxFrameSize: ChannelSocketServer.maxMessageSize))
-            ) { request, channel, logger in
-                try await channels.shouldUpgrade(request, channel: channel, logger: logger)
+            HTTPServerBuilder { responder in
+                ClosingUnusedConnections(base: HTTP1WebSocketUpgradeChannel(
+                    responder: responder,
+                    configuration: .init(ws: .init(maxFrameSize: ChannelSocketServer.maxMessageSize))
+                ) { request, channel, logger in
+                    try await channels.shouldUpgrade(request, channel: channel, logger: logger)
+                })
             }
         }
         guard let tls else { return webSocket ?? .http1() }
@@ -130,6 +135,41 @@ public struct ServerConfig: Sendable {
         )
         if let webSocket { return try .tls(webSocket, tlsConfiguration: configuration) }
         return try .http2Upgrade(tlsConfiguration: configuration)
+    }
+}
+
+/// Closes a connection that hasn't sent anything when the server stops.
+///
+/// Hummingbird's WebSocket upgrade channel handles a stopping server only once a
+/// connection's first request arrives, so an unused connection, such as a
+/// browser's preconnect, kept the server running until the client closed it.
+private struct ClosingUnusedConnections<Base: ServerChildChannel>: ServerChildChannel {
+    let base: Base
+
+    func setup(channel: any NIOCore.Channel, logger: Logger) -> EventLoopFuture<Base.Value> {
+        channel.eventLoop.makeCompletedFuture {
+            try channel.pipeline.syncOperations.addHandler(CloseWhenStoppingUnused())
+        }.flatMap { base.setup(channel: channel, logger: logger) }
+    }
+
+    func handle(value: Base.Value, logger: Logger) async {
+        await base.handle(value: value, logger: logger)
+    }
+}
+
+private final class CloseWhenStoppingUnused: ChannelInboundHandler, RemovableChannelHandler {
+    typealias InboundIn = ByteBuffer
+    typealias InboundOut = ByteBuffer
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        context.fireChannelRead(data)
+        // From its first request on, the connection's HTTP or WebSocket handlers close it.
+        context.pipeline.syncOperations.removeHandler(context: context, promise: nil)
+    }
+
+    func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
+        guard event is ChannelShouldQuiesceEvent else { return context.fireUserInboundEventTriggered(event) }
+        context.close(promise: nil)
     }
 }
 
