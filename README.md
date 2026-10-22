@@ -541,9 +541,12 @@ and session changes.
 
 ## Contributing
 
-Keep changes grounded in a runnable workflow. For framework or generator changes,
-run `swift test` and the generated-app acceptance check. Include the relevant
-companion repository revisions when reporting integration results.
+Keep changes grounded in a runnable workflow. Before pushing a framework or
+generator change, commit it and run `python3 scripts/check_local.py`, which runs
+CI's jobs on your machine: the tests on it and in a Linux container (Docker),
+against PostgreSQL and Valkey, the example app with its browser tests, and the
+generated-app acceptance check from a roost-cli checkout beside this one. Include
+the relevant companion repository revisions when reporting integration results.
 
 Start with the [Todo tutorial](guides/tutorial-todo-app.md) or
 [session lifecycle](guides/server-side-sessions.md). The [specs](specs/README.md)

@@ -20,6 +20,7 @@ swift test --filter ControllerTests/restRoutes   # one test, by function name
 swift test list                              # print test identifiers
 VALKEY_URL=valkey://127.0.0.1:6379 swift test --traits Valkey   # also run the store conformance tests against a Valkey server
 POSTGRES_URL=postgres://postgres:postgres@localhost:5432/roost_jobs_test swift test --filter PostgresJobQueueTests   # job queue against PostgreSQL; creates and drops scratch databases
+python3 scripts/check_local.py               # every ci.yml job on this machine, against the committed checkout; run before pushing
 ```
 
 - Requires Swift 6.3+ and macOS 15+ or Linux. On Linux, Nexus needs `zlib1g-dev`.
