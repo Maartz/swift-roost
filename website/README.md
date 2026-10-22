@@ -66,7 +66,7 @@ For a custom domain, update the canonical URL, social metadata, sitemap,
 - `playground/examples.mjs` defines the Swift samples and validates supported edits;
   `playground/app.mjs` manages the editor and safe DOM previews. The focused Node
   tests cover the boundary between editable values and fixed program structure.
-- Keep the status copy aligned with releases. The site describes Roost 2.4.0,
+- Keep the status copy aligned with releases. The site describes Roost 2.5.0,
   Spectro 2.x (from 2.3.1), Nexus 2.x (from 2.1.0), and ESW 1.7.0. The separate local Playground
   has its own setup and release status.
 - Manrope and IBM Plex Mono are self-hosted from the [Google Fonts source repository](https://github.com/google/fonts).

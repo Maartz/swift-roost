@@ -4,7 +4,7 @@ Generate a small app, run its first route, and test it without a database.
 
 ## Overview
 
-This guide uses Roost 2.4.0 with published ESW 1.7.0,
+This guide uses Roost 2.5.0 with published ESW 1.7.0,
 Spectro 2.x (from 2.3.1), and Nexus 2.x (from 2.1.0). You need Swift 6.3 or later and macOS 15+ or a
 supported Linux environment. On Debian/Ubuntu, Nexus also needs `zlib1g-dev`
 at build time and `zlib1g` at runtime.
@@ -18,7 +18,7 @@ Install the CLI with [Mint](https://github.com/yonaskolb/Mint):
 
 ```sh
 brew install mint
-mint install roost-framework/roost-cli@3.0.0
+mint install roost-framework/roost-cli@3.0.1
 roost --version
 ```
 
@@ -30,7 +30,7 @@ of Roost and its companion packages.
 Without Mint, for example on Linux, build from a checkout:
 
 ```sh
-git clone --branch 3.0.0 --depth 1 https://github.com/roost-framework/roost-cli.git
+git clone --branch 3.0.1 --depth 1 https://github.com/roost-framework/roost-cli.git
 cd roost-cli
 swift build -c release --product roost
 ```

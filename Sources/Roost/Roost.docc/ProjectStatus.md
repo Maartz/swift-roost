@@ -4,7 +4,7 @@ Distinguish the implemented application workflow from development integrations.
 
 ## Overview
 
-This catalog documents Roost 2.4.0, including live pages, reusable form fields, and the `db` and `routes` app commands. Releases before 2.0.0 use the earlier Peregrine module and executable names.
+This catalog documents Roost 2.5.0, including channels, jobs kept in PostgreSQL, live pages the server updates, PubSub between servers, and HTTPS. Releases before 2.0.0 use the earlier Peregrine module and executable names.
 
 The core development path is a PostgreSQL-backed app with authentication,
 ownership-scoped resources, HTML and JSON responses, Spectro migrations,

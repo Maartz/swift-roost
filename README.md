@@ -57,9 +57,11 @@ struct PageController: Controller {
 }
 ```
 
-**Roost 2.4.0** adds the database and route commands behind `roost db` and
-`roost routes`, on top of 2.3's live pages, reusable form fields, typed writes,
-migration registries, and key-value stores. Routes name controller actions the compiler
+**Roost 2.5.0** adds channels that Phoenix's JavaScript client connects to, jobs
+kept in PostgreSQL, live pages the server updates, PubSub between servers through
+Valkey, and HTTPS, on top of 2.4's `roost db` and `roost routes` commands and
+2.3's live pages, reusable form fields, typed writes, migration registries, and
+key-value stores. Routes name controller actions the compiler
 checks; `resources` builds REST routes and controller plugs run before chosen
 actions. `conn.permit` decodes only declared fields. Requests are logged and traced
 by action with secrets filtered. It uses
@@ -171,7 +173,7 @@ Install the CLI with [Mint](https://github.com/yonaskolb/Mint):
 
 ```sh
 brew install mint
-mint install roost-framework/roost-cli@3.0.0
+mint install roost-framework/roost-cli@3.0.1
 roost --version
 ```
 
@@ -183,14 +185,14 @@ not resolve the framework's dependencies.
 Without Mint, for example on Linux, build from a checkout:
 
 ```sh
-git clone --branch 3.0.0 --depth 1 https://github.com/roost-framework/roost-cli.git
+git clone --branch 3.0.1 --depth 1 https://github.com/roost-framework/roost-cli.git
 cd roost-cli
 swift build -c release --product roost
 ```
 
 Then copy `.build/release/roost` to a directory on your `PATH`.
 
-Generated apps download Roost 2.4.0, Spectro 2.x (from 2.3.1), Nexus 2.x (from 2.1.0),
+Generated apps download Roost 2.5.0, Spectro 2.x (from 2.3.1), Nexus 2.x (from 2.1.0),
 and ESW 1.7.0 through SwiftPM. No companion source checkouts or dependency overrides are needed.
 Roost turns off Nexus's default `Vapor` trait, so SwiftPM skips Vapor and its dependencies.
 Existing apps retain their resolved versions until you run `swift package update`.
@@ -503,7 +505,7 @@ runtime, installs zlib, and includes public assets and the SQL files in
 `Sources/Migrations/`, but not yet the resource bundle a migration registry
 needs. Supply the
 `DB_*` variables to the container. Generated Dockerfiles resolve published
-dependencies, including Roost 2.4.0; no framework source checkout is required
+dependencies, including Roost 2.5.0; no framework source checkout is required
 in the container build context.
 
 ## Troubleshooting

@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 2.5.0 — 2026-10-22
+
+Channels in Phoenix's protocol, jobs kept in PostgreSQL, live pages the server
+updates, PubSub between servers through Valkey, and HTTPS. Roost now requires
+macOS 15 on macOS.
 
 - `ServerConfig(tls:)` serves HTTPS from a PEM certificate chain and key, and
   negotiates HTTP/2 with clients that support it, falling back to HTTP/1.1.
